@@ -34,7 +34,7 @@ with open(os.path.join(here, 'README.rst')) as f:
 
 setup(
     name='score.webassets',
-    version='0.1.3',
+    version='0.1.4',
     description='Web assets management for The SCORE Framework',
     long_description=README,
     author='strg.at',
@@ -42,6 +42,8 @@ setup(
     url='http://score-framework.org',
     keywords='score framework web css js pyramid',
     packages=['score.webassets'],
+    namespace_packages=['score'],
+    zip_safe=False,
     license='LGPL',
     classifiers=[
         'Development Status :: 4 - Beta',
