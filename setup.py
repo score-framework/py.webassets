@@ -65,6 +65,6 @@ setup(
     ],
     extras_require={
         'pyramid': ['pyramid >= 1.5'],
-        'netfs': ['score.netfs >= 0.2.1'],
+        'netfs': ['score.netfs >= 0.3.10'],
     },
 )

@@ -236,23 +236,24 @@ class Netfs:
         os.makedirs(os.path.dirname(cachepath), exist_ok=True)
         tmppath = cachepath + '.tmp'
         tmpfile = open(tmppath, 'wb')
+        connection = self.netfs.connect()
         from score.netfs import DownloadFailed
         try:
             fcntl.flock(tmpfile, fcntl.LOCK_EX)
             if os.path.exists(cachepath):
                 # another process downloaded the file
                 return hash
-            time = self.netfs.download(self._netfspath(category, path, hash),
+            time = connection.download(self._netfspath(category, path, hash),
                                        tmpfile)
         except DownloadFailed:
             # generate content and upload
             content = content_generator()
             open(cachepath, 'wb').write(content)
             netfspath = self._netfspath(category, path, hash)
-            self.netfs.upload(netfspath, io.BytesIO(content))
+            connection.upload(netfspath, io.BytesIO(content))
             # TODO: The next line commits netfs unconditionally,
             #   which is definitely not ok.
-            self.netfs.commit()
+            connection.commit()
             return hash
         finally:
             fcntl.flock(tmpfile, fcntl.LOCK_UN)
@@ -274,8 +275,8 @@ class Netfs:
             if os.path.exists(cachepath):
                 # another process downloaded the file
                 return self.versionmanager.load(category, path, hash)
-            time = self.netfs.download(self._netfspath(category, path, hash),
-                                       tmpfile)
+            time = self.netfs.connect().download(
+                self._netfspath(category, path, hash), tmpfile)
         finally:
             fcntl.flock(tmpfile, fcntl.LOCK_UN)
             tmpfile.close()
