@@ -83,13 +83,25 @@ def init(confdict, configurator, netfs_conf=None):
 class DummyRequest(Request):
     """
     Derives from :class:`pyramid.request.Request` to override url generating
-    functions. This class will always omit the schema/domain of the url,
-    making them all relative to the current host.
+    functions. By default, this class will omit the schema/domain of the url,
+    making all URLs relative to the current host. This behaviour can be changed
+    by setting the attribute ``app_url`` on the request object:
+
+    >>> d = DummyRequest.blank('/')
+    >>> d.route_url('somewhere')
+    /somewhere
+    >>> d.app_url = 'http://foo.bar'
+    >>> d.route_url('somewhere')
+    http://foo.bar/somewhere
     """
+
+    def __init__(self, *args, **kwargs):
+        self.app_url = ''
+        Request.__init__(self, *args, **kwargs)
 
     def route_url(self, route_name, *elements, **kw):
         if '_app_url' not in kw:
-            kw['_app_url'] = ''
+            kw['_app_url'] = self.app_url
         return super().route_url(route_name, *elements, **kw)
 
 
