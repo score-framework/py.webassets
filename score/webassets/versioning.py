@@ -270,6 +270,7 @@ class Netfs:
         os.makedirs(os.path.dirname(cachepath), exist_ok=True)
         tmppath = cachepath + '.tmp'
         tmpfile = open(tmppath, 'wb')
+        from score.netfs import DownloadFailed
         try:
             fcntl.flock(tmpfile, fcntl.LOCK_EX)
             if os.path.exists(cachepath):
@@ -277,6 +278,8 @@ class Netfs:
                 return self.versionmanager.load(category, path, hash)
             time = self.netfs.connect().download(
                 self._netfspath(category, path, hash), tmpfile)
+        except DownloadFailed:
+            return
         finally:
             fcntl.flock(tmpfile, fcntl.LOCK_UN)
             tmpfile.close()
