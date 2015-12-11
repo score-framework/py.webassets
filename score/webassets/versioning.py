@@ -235,31 +235,30 @@ class Netfs:
             return hash
         os.makedirs(os.path.dirname(cachepath), exist_ok=True)
         tmppath = cachepath + '.tmp'
-        tmpfile = open(tmppath, 'wb')
-        connection = self.netfs.connect()
         from score.netfs import DownloadFailed
         try:
+            tmpfile = open(tmppath, 'wb')
+            connection = self.netfs.connect()
             fcntl.flock(tmpfile, fcntl.LOCK_EX)
             if os.path.exists(cachepath):
                 # another process downloaded the file
                 return hash
             time = connection.download(self._netfspath(category, path, hash),
                                        tmpfile)
+            os.utime(tmppath, (time, time))
+            shutil.move(tmppath, cachepath)
         except DownloadFailed:
             # generate content and upload
             content = content_generator()
             open(cachepath, 'wb').write(content)
             netfspath = self._netfspath(category, path, hash)
             connection.upload(netfspath, io.BytesIO(content))
-            # TODO: The next line commits netfs unconditionally,
-            #   which is definitely not ok.
             connection.commit()
             return hash
         finally:
             fcntl.flock(tmpfile, fcntl.LOCK_UN)
             tmpfile.close()
-        os.utime(tmppath, (time, time))
-        shutil.move(tmppath, cachepath)
+            os.unlink(tmppath)
         return hash
 
     def load(self, category, path, hash):
@@ -269,20 +268,21 @@ class Netfs:
         cachepath = self._cache_file(category, path, hash)
         os.makedirs(os.path.dirname(cachepath), exist_ok=True)
         tmppath = cachepath + '.tmp'
-        tmpfile = open(tmppath, 'wb')
         from score.netfs import DownloadFailed
         try:
+            tmpfile = open(tmppath, 'wb')
             fcntl.flock(tmpfile, fcntl.LOCK_EX)
             if os.path.exists(cachepath):
                 # another process downloaded the file
                 return self.versionmanager.load(category, path, hash)
             time = self.netfs.connect().download(
                 self._netfspath(category, path, hash), tmpfile)
+            os.utime(tmppath, (time, time))
+            shutil.move(tmppath, cachepath)
         except DownloadFailed:
             return
         finally:
             fcntl.flock(tmpfile, fcntl.LOCK_UN)
             tmpfile.close()
-        os.utime(tmppath, (time, time))
-        shutil.move(tmppath, cachepath)
+            os.unlink(tmppath)
         return self.versionmanager.load(category, path, hash)
