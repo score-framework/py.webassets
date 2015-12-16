@@ -160,7 +160,8 @@ class PyramidVersionManager:
             if result:
                 body, age = result
                 request.response.body = body
-                request.response.max_age = str(60 * 60 * 24 * 30 * 12)  # 1 year
+                request.response.cache_control.max_age = \
+                    str(60 * 60 * 24 * 30 * 12)  # ~1 year
                 request.response.age = age
                 request.response.etag = hash
                 return True
