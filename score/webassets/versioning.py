@@ -160,6 +160,39 @@ class Dummy(VersionManager):
         pass
 
 
+class Frozen(VersionManager):
+    """
+    A caching version manager that generates file hashes only once and returns
+    the same value on consecutive calls. See its :meth:`.create_file_hasher`
+    function.
+
+    Note: This object never clears is targeted at environments that do not
+    change during runtime (hence its name). It never clears its internal
+    cache, for example. Use this class only if you have such an environment.
+    """
+
+    def __init__(self, folder):
+        super().__init__(folder)
+        self.hashers = {}
+
+    def create_file_hasher(self, files):
+        """
+        Overridden to cache the result of the hasher returned by the parent.
+        """
+        if isinstance(files, str) or not hasattr(files, '__iter__'):
+            files = files,
+        if not len(files):
+            return lambda: None
+        files = tuple(files)
+        try:
+            return self.hashers[files]
+        except KeyError:
+            hasher = super().create_file_hasher(files)
+            hash = hasher()
+            self.hashers[files] = lambda: hash
+            return self.hashers[files]
+
+
 class Mercurial(VersionManager):
     """
     A version manager that ignores provided hashers and just uses the current
