@@ -39,6 +39,7 @@ import re
 import shutil
 import textwrap
 import time
+import subprocess
 
 
 log = logging.getLogger(__name__)
@@ -184,52 +185,116 @@ class Frozen(VersionManager):
         if not len(files):
             return lambda: None
         files = tuple(files)
-        try:
-            return self.hashers[files]
-        except KeyError:
-            hasher = super().create_file_hasher(files)
-            hash = hasher()
+        if files not in self.hashers:
+            hash = self._gen_hash(files)
             self.hashers[files] = lambda: hash
-            return self.hashers[files]
+        return self.hashers[files]
+
+    def _gen_hash(self, files):
+        hasher = super().create_file_hasher(files)
+        return hasher()
 
 
-class Mercurial(VersionManager):
+class Repository(Frozen):
     """
-    A version manager that ignores provided hashers and just uses the current
-    changeset hashes of provided *repositories* folders.
+    A special typo of :class:`.Frozen` VersionManager that uses the last
+    changeset hash where files were last modified in given mercurial or git
+    *repositories*, instead of the last local modification timestamp. This
+    method will thus generate the same timestamp on two different machines,
+    provided they are accessing the same repositories.
     """
 
     def __init__(self, folder, repositories):
         super().__init__(folder)
-        self.hashers = list(map(self.create_repo_hasher, repositories))
+        for repo in repositories[:]:
+            repositories += self._init_repo(repo)
+        self.repositories = repositories
+        self.repositories.sort(key=lambda r: len(r[1]))
 
-    def store(self, category, path, hashers, content_generator):
-        # ignore *hashers*, use *self.hashers* instead
-        return super().store(category, path, self.hashers, content_generator)
+    def _init_repo(self, repo):
+        """
+        Finds all subrepositories of given *repo* and recurses through them.
+        """
+        repo = os.path.abspath(repo)
+        if os.path.exists(repo + '/.hg'):
+            return self._init_hg_repo(repo)
+        elif os.path.exists(repo + '/.git'):
+            return self._init_git_repo(repo)
+        raise Exception('Not a repository: ' + repo)
 
-    def create_repo_hasher(self, repository):
+    def _init_hg_repo(self, repo):
+        file = '%s/.hgsub' % repo
+        if not os.path.exists(file):
+            return []
+        subrepos = [('hg', repo)]
+        for line in open(file).read().split('\n'):
+            line = re.sub('#.*', '', line).strip()
+            if not line:
+                continue
+            subrepo = '%s/%s' % (repo, line.split('=')[0].strip())
+            subrepos += self._init_repo(subrepo)
+        return subrepos
+
+    def _init_git_repo(self, repo):
+        subrepos = [('git', repo)]
+        cmd = ['git', 'submodule', 'status']
+        status = str(subprocess.check_output(cmd, cwd=repo), 'ASCII')
+        for line in filter(None, status.split('\n')):
+            subrepo = repo + '/' + line.split(' ')[2]
+            subrepos += self._init_repo(subrepo)
+        return subrepos
+
+    def _gen_hash(self, files):
         """
-        Creates a hashing function for given mercurial *repository* folder.
+        Returns the most-recent changeset hash for the list of given files.
         """
-        def hasher():
-            # the old implementation was using an external call to `hg`, which
-            # was quite slow. now reading repository data directly, below.
-            #   args = ['hg', '--debug', 'identify', '--id']
-            #   process = subprocess.Popen(
-            #       args,
-            #       cwd=os.path.abspath(repository),
-            #       stdin=subprocess.PIPE,
-            #       stdout=subprocess.PIPE,
-            #       stderr=subprocess.PIPE)
-            #   stdout, stderr = process.communicate()
-            #   if stderr:
-            #       log.error('Error retrieving repository hash: %s' % stderr)
-            #       return None
-            #   return stdout[:-1]
-            file = open(os.path.join(repository, '.hg', 'dirstate'), 'rb')
-            bin = file.read(20)
-            return hex(int.from_bytes(bin, 'big'))
-        return hasher
+        repo2files = {}
+        files = list(files)
+        for file in files[:]:
+            absfile = os.path.abspath(file)
+            for repo in self.repositories:
+                # FIXME: we're just checking if the file is in a sub-folder, but
+                # it might actually be an untracked file.
+                if absfile.startswith(repo[1]):
+                    try:
+                        repo2files[repo].append(absfile)
+                    except KeyError:
+                        repo2files[repo] = [absfile]
+                    files.remove(file)
+                    break
+        hashes = []
+        if files:
+            # These files are outside of repositories, we will hash their
+            # content, as the last modification timestamps on different machines
+            # might differ.
+            log.info('Using MD5 for these files outside of configured '
+                     'repositories:\n - ' + '\n - '.join(files))
+            for file in files:
+                md5 = hashlib.md5()
+                with open(file, "rb") as f:
+                    for chunk in iter(lambda: f.read(4096), b""):
+                        md5.update(chunk)
+                hashes.append(md5.hexdigest())
+        for repo, files in repo2files.items():
+            if repo[0] == 'hg':
+                hashes.append(self._gen_hg_hash(repo[1], files))
+            else:
+                hashes.append(self._gen_git_hash(repo[1], files))
+        return hashlib.sha256(' '.join(hashes).encode('UTF-8')).hexdigest()
+
+    def _gen_hg_hash(self, repo, files):
+        cmd = ['hg', 'log', '--limit=1', '--template="{node}"'] + files
+        result = str(subprocess.check_output(cmd, cwd=repo), 'ASCII')
+        return result[:-1]
+
+    def _gen_git_hash(self, repo, files):
+        cmd = ['git', 'log', '--format=format:%H', '--max-count=1'] + files
+        result = str(subprocess.check_output(cmd, cwd=repo), 'ASCII')
+        return result[:-1]
+
+
+# for backward compatibility
+Mercurial = Repository
 
 
 class Netfs:

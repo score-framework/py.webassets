@@ -209,7 +209,7 @@ The asset versioning is implemented in the package
 
 .. autoclass:: score.webassets.versioning.Dummy()
 
-.. autoclass:: score.webassets.versioning.Mercurial
+.. autoclass:: score.webassets.versioning.Repository
 
 Pyramid Integration
 ===================
