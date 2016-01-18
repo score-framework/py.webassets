@@ -32,8 +32,8 @@ class VirtualAssets:
         """
         assert path not in self.assets
         if hasher is None:
-            def hasher():
-                result = callback()
+            def hasher(ctx):
+                result = callback(ctx)
                 if isinstance(result, str):
                     result = result.encode('UTF-8')
                 sha = hashlib.sha256()
@@ -47,19 +47,19 @@ class VirtualAssets:
         """
         return self.assets.keys()
 
-    def render(self, path):
+    def render(self, ctx, path):
         """
         Invokes the callback of the asset with given *path* and returns its
         result.
         """
-        return self.assets[path][0]()
+        return self.assets[path][0](ctx)
 
-    def hash(self, path):
+    def hash(self, ctx, path):
         """
         Invokes the hashing function of the asset with given *path* and
         returns its result.
         """
-        return self.assets[path][1]()
+        return self.assets[path][1](ctx)
 
     def decorator(self, suffix):
         """
