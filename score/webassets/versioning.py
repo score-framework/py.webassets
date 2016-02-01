@@ -255,9 +255,9 @@ class Repository(Frozen):
 
     def __init__(self, folder, repositories):
         super().__init__(folder)
-        for repo in repositories[:]:
-            repositories += self._init_repo(repo)
-        self.repositories = repositories
+        self.repositories = []
+        for repo in repositories:
+            self.repositories += self._init_repo(repo)
         self.repositories.sort(key=lambda r: len(r[1]))
 
     def _init_repo(self, repo):
