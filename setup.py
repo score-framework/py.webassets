@@ -41,7 +41,7 @@ setup(
     author_email='score@strg.at',
     url='http://score-framework.org',
     keywords='score framework web css js pyramid',
-    packages=['score.webassets'],
+    packages=['score', 'score.webassets'],
     namespace_packages=['score'],
     zip_safe=False,
     license='LGPL',
