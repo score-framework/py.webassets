@@ -61,10 +61,6 @@ setup(
         'Topic :: Software Development :: Libraries :: Application Frameworks',
     ],
     install_requires=[
-        'score.init >= 0.1',
+        'score.init >= 0.3',
     ],
-    extras_require={
-        'pyramid': ['pyramid >= 1.5'],
-        'netfs': ['score.netfs >= 0.3.10'],
-    },
 )
