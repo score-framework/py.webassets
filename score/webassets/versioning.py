@@ -332,6 +332,9 @@ class Repository(Frozen):
         return hashlib.sha256(' '.join(hashes).encode('UTF-8')).hexdigest()
 
     def _gen_hg_hash(self, repo, files):
+        # FIXME: The method used here does not detect any changes that were
+        # *merged* into the current branch. Here is a related SO question:
+        # http://stackoverflow.com/questions/6134476/get-all-changed-files-for-a-given-directory-in-a-branch
         cmd = ['hg', 'log', '--limit=1', '--template="{node}"'] + files
         result = str(subprocess.check_output(cmd, cwd=repo), 'ASCII')
         return result[:-1]
