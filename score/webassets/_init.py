@@ -36,7 +36,7 @@ defaults = {
 }
 
 
-def init(confdict, http, netfs=None):
+def init(confdict, http=None, netfs=None):
     """
     Initializes this module acoording to :ref:`our module initialization
     guidelines <module_initialization>` with the following configuration keys:
@@ -70,7 +70,8 @@ def init(confdict, http, netfs=None):
 
     def assetnotfound(ctx, exception):
         raise HTTPNotFound()
-    http.exception_handlers[AssetNotFound] = assetnotfound
+    if http:
+        http.exception_handlers[AssetNotFound] = assetnotfound
     return ConfiguredWebassetsModule(conf['cachedir'], versionmanager)
 
 
