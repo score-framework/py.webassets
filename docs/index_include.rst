@@ -209,17 +209,7 @@ The asset versioning is implemented in the package
 
 .. autoclass:: score.webassets.versioning.Dummy()
 
+.. autoclass:: score.webassets.versioning.Frozen
+
 .. autoclass:: score.webassets.versioning.Repository
-
-Pyramid Integration
-===================
-
-.. automodule:: score.webassets.pyramid
-
-.. autofunction:: score.webassets.pyramid.init
-
-.. autoclass:: score.webassets.pyramid.DummyRequest()
-
-.. autoclass:: score.webassets.pyramid.PyramidVersionManager
-    :members:
 
