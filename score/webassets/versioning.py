@@ -300,7 +300,7 @@ class Repository(Frozen):
         repo2files = {}
         files = list(files)
         for file in files[:]:
-            absfile = os.path.abspath(file)
+            absfile = os.path.realpath(file)
             for repo in self.repositories:
                 # FIXME: we're just checking if the file is in a sub-folder, but
                 # it might actually be an untracked file.
