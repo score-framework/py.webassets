@@ -25,7 +25,7 @@
 # Licensee has his registered seat, an establishment or assets.
 
 from score.init import (
-    init_object, init_cache_folder, ConfiguredModule, parse_bool)
+    parse_object, init_cache_folder, ConfiguredModule, parse_bool)
 from .versioning import Netfs as NetfsVersionManager
 from webob.exc import HTTPNotFound
 
@@ -49,8 +49,9 @@ def init(confdict, http=None, netfs=None):
         without an explicit `cachedir` of its own.
 
     :confkey:`versionmanager` :default:`score.webassets.versioning.Dummy`
-        The :class:`VersionManager` to use. This value will be converted to an
-        object using :func:`score.init.init_object`.
+        The :class:`VersionManager <score.webassets.versioning.VersionManager>`
+        to use. This value will be converted to an object using
+        :func:`score.init.parse_object`.
 
         See the :mod:`package description <score.webassets.versioning>` for
         available implementations.
@@ -64,7 +65,7 @@ def init(confdict, http=None, netfs=None):
     conf.update(confdict)
     if conf['cachedir']:
         init_cache_folder(conf, 'cachedir', autopurge=True)
-    versionmanager = init_object(conf, 'versionmanager')
+    versionmanager = parse_object(conf, 'versionmanager')
     if netfs and parse_bool(conf['netfs']):
         versionmanager = NetfsVersionManager(versionmanager, netfs)
 

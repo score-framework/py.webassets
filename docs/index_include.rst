@@ -1,17 +1,83 @@
 .. module:: score.webassets
-.. role:: faint
+.. role:: default
 .. role:: confkey
 
 ***************
 score.webassets
 ***************
 
-Introduction
-============
-
 The aim of this module is to provide an infrastructure for handling assets in
 a web project. An :term:`asset` is a static resource that is required by the
 web application, like a javascript file, or css definitions.
+
+Quickstart
+==========
+
+.. note::
+
+    You can study the source of the :mod:`score.css` or :mod:`score.js` for a
+    more code-centered introduction to this module.
+
+Let's assume, we want to integrate many small video files into our
+applications. In fact, they are so common on the page, that they should be
+properly versioned and cached. And we already have a :ref:`route <http_router>`
+for delivering our video files:
+
+.. code-block:: python
+
+    @router.route('video', '/video/{path>.*}')
+    def video(ctx, path):
+        file = path2file(ctx, path)
+        ctx.http.response.body_iter = open(file)
+
+Let's first add a version to every URL by adding a :ref:`URL converter
+<http_url_conversion>` to the route:
+
+.. code-block:: python
+
+    @video.vars2url
+    def movie_vars2url(ctx, path)
+        url = '/video/' + path
+        file = path2file(ctx, path)
+        versionmanager = ctx.webassets.versionmanager
+
+        hasher = versionmanager.create_file_hasher(file)
+
+        def renderer():
+            return open(file, 'rb').read()
+
+        hash_ = versionmanager.store('video', path, hasher, renderer)
+        if hash_:
+            url += '?_v=' + hash_
+        return url
+
+The URL will always be the same, as long as the content of the video file
+remains unchanged. We can now make use of this fact by telling the browser to
+keep this URL in its cache forever. If the browser asks us, whether the content
+of URL has changed, we can immediately send back the `HTTP status code 304`_.
+We only have to invoke :meth:`VersionManager.handle_request
+<score.webassets.versioning.VersionManager.handle_request>` at the beginning
+of our route for this to happen automatically:
+
+.. code-block:: python
+
+    @router.route('video', '/video/{path>.*}')
+    def video(ctx, path):
+        versionmanager = self.webassets.versionmanager
+        if versionmanager.handle_request(ctx, 'video', path):
+            return
+        file = path2file(ctx, path)
+        ctx.http.response.body_iter = open(file)
+
+.. _HTTP status code 304: https://tools.ietf.org/html/rfc7232#section-4.1
+
+Configuration
+=============
+
+.. autofunction:: score.webassets.init
+
+Details
+=======
 
 Assets
 ------
@@ -170,8 +236,11 @@ values as version strings, though, as the class cannot know when the number
 needs to be incremented. Instead, it operates on hashed value, like the hashed
 timestamps of the asset files.
 
+API
+===
+
 Configuration
-=============
+-------------
 
 .. autofunction:: score.webassets.init
 
@@ -191,13 +260,13 @@ Configuration
 .. autoexception:: score.webassets.AssetNotFound
 
 Virtual Assets
-==============
+--------------
 
 .. autoclass:: score.webassets.VirtualAssets
     :members:
 
 Version Management
-==================
+------------------
 
 The asset versioning is implemented in the package
 `score.webassets.versioning`.
