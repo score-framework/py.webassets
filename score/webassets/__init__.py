@@ -37,8 +37,9 @@ asset versioning - as well as an adaption for the pyramid framework.
 """
 
 from ._init import init, ConfiguredWebassetsModule, AssetNotFound
-from ._virtual import VirtualAssets
+from .proxy import TemplateWebassetsProxy, WebassetsProxy
 
 
 __all__ = (
-    'init', 'ConfiguredWebassetsModule', 'AssetNotFound', 'VirtualAssets')
+    'init', 'ConfiguredWebassetsModule', 'AssetNotFound',
+    'TemplateWebassetsProxy', 'WebassetsProxy',)
