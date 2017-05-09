@@ -229,9 +229,13 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             t = time.mktime(email.utils.parsedate(
                 request.headers['If-Modified-Since']))
             folder = os.path.join(self.rootdir, module, path)
-            if not any(os.path.getmtime(f) > t for f in os.listdir(folder)):
-                # there aren't any newer files in this folder
-                return 304
+            try:
+                if not any(os.path.getmtime(f) > t for f in os.listdir(folder)):
+                    # there aren't any newer files in this folder
+                    return 304
+            except FileNotFoundError:
+                # folder does not exist, ignore
+                pass
         hash_ = request.GET.get('_v', None)
         mimetype, body = loader(hash_)
         headers = {
