@@ -129,8 +129,10 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             paths = list(sorted(proxy.iter_paths()))
             if not paths:
                 return ''
-        return '<script src="%s"></script>' % self.http.url(
-            None, 'score.webassets', module, paths)
+        else:
+            proxy = self._get_proxy(module, *paths)
+        url = self.http.url(None, 'score.webassets', module, paths)
+        return proxy.render_url(url)
 
     def get_bundle_hash(self, module, paths):
         if not paths:
