@@ -24,7 +24,8 @@
 # the discretion of STRG.AT GmbH also the competent court, in whose district the
 # Licensee has his registered seat, an establishment or assets.
 
-from score.init import ConfiguredModule, ConfigurationError, parse_list
+from score.init import (
+    ConfiguredModule, ConfigurationError, parse_list, parse_bool)
 import os
 import email.utils
 import time
@@ -36,6 +37,7 @@ Request = namedtuple('Request', ('path', 'GET', 'headers'))
 defaults = {
     'rootdir': None,
     'modules': [],
+    'freeze': False,
 }
 
 
@@ -58,7 +60,12 @@ def init(confdict, http=None, tpl=None):
     if not os.path.exists(conf['rootdir']):
         raise ConfigurationError(
             'score.webassets', 'Configured rootdir does not exist')
-    return ConfiguredWebassetsModule(http, tpl, modules, conf['rootdir'])
+    try:
+        freeze = parse_bool(conf['freeze'])
+    except ValueError:
+        freeze = conf['freeze']
+    return ConfiguredWebassetsModule(http, tpl, modules, conf['rootdir'],
+                                     freeze)
 
 
 class ConfiguredWebassetsModule(ConfiguredModule):
@@ -67,41 +74,49 @@ class ConfiguredWebassetsModule(ConfiguredModule):
     <score.init.ConfiguredModule>`.
     """
 
-    def __init__(self, http, tpl, modules, rootdir):
+    def __init__(self, http, tpl, modules, rootdir, freeze):
         super().__init__(__package__)
         self.http = http
         self.tpl = tpl
         self.modules = modules
         self.rootdir = rootdir
+        self.freeze = freeze
+        self._frozen_versions = {}
         if tpl:
-            tpl.filetypes['text/html'].add_global(
-                'webassets', self._generate_script_tag, escape=False)
+            self._register_tpl_globals()
         if http:
-            @http.newroute('score.webassets', '/_assets/{module}/{path>.*}')
-            def webassets(ctx, module, paths):
-                request = ctx.http.request
-                result = self.get_request_response(Request(
-                    '/' + request.path.lstrip('/').split('/', maxsplit=1)[1],
-                    request.GET,
-                    request.headers,
-                ))
-                if isinstance(result, int):
-                    ctx.http.response.status = result
-                else:
-                    for header, value in result[0].items():
-                        ctx.http.response.headers[header] = value
-                    ctx.http.response.text = result[1]
+            self._register_http_route()
 
-            @webassets.vars2url
-            def webassets_vars2url(ctx, module, paths):
-                return '/_assets' + self.get_bundle_url(module, paths)
+    def _register_tpl_globals(self):
+        self.tpl.filetypes['text/html'].add_global(
+            'webassets', self._generate_script_tag, escape=False)
 
-            @webassets.match2vars
-            def webassets_match2vars(ctx, matches):
-                return {
-                    'module': matches['module'],
-                    'paths': matches['path'],
-                }
+    def _register_http_route(self):
+        @self.http.newroute('score.webassets', '/_assets/{module}/{path>.*}')
+        def webassets(ctx, module, paths):
+            request = ctx.http.request
+            result = self.get_request_response(Request(
+                '/' + request.path.lstrip('/').split('/', maxsplit=1)[1],
+                request.GET,
+                request.headers,
+            ))
+            if isinstance(result, int):
+                ctx.http.response.status = result
+            else:
+                for header, value in result[0].items():
+                    ctx.http.response.headers[header] = value
+                ctx.http.response.text = result[1]
+
+        @webassets.vars2url
+        def webassets_vars2url(ctx, module, paths):
+            return '/_assets' + self.get_bundle_url(module, paths)
+
+        @webassets.match2vars
+        def webassets_match2vars(ctx, matches):
+            return {
+                'module': matches['module'],
+                'paths': matches['path'],
+            }
 
     def _finalize(self, score):
         self.proxies = dict(
@@ -120,6 +135,8 @@ class ConfiguredWebassetsModule(ConfiguredModule):
     def get_bundle_hash(self, module, paths):
         if not paths:
             raise ValueError('No paths provided')
+        if isinstance(self.freeze, str):
+            return self.freeze
         hashes = []
         proxy = self._get_proxy(module, *paths)
         for path in sorted(paths):
@@ -152,10 +169,25 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             url += '?_v=' + bundle_hash
         return url
 
+    def get_asset_hash(self, module, path):
+        if isinstance(self.freeze, str):
+            return self.freeze
+        elif self.freeze:
+            key = '%s/%s' % (module, path)
+            try:
+                return self._frozen_versions[key]
+            except KeyError:
+                proxy = self._get_proxy(module, path)
+                hash_ = proxy.hash(path)
+                self._frozen_versions[key] = hash_
+                return hash_
+        else:
+            return None
+
     def get_asset_url(self, module, path):
         proxy = self._get_proxy(module, path)
         url = '/%s/%s' % (module, path)
-        hash_ = proxy.hash(path)
+        hash_ = self.get_asset_hash(module, path)
         if hash_:
             file = os.path.join(self.rootdir, module, path, hash_)
             if not os.path.exists(file):
