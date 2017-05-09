@@ -111,7 +111,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
     def _generate_script_tag(self, module, *paths):
         if not paths:
             proxy = self._get_proxy(module)
-            paths = list(proxy.iter_paths())
+            paths = list(sorted(proxy.iter_paths()))
             if not paths:
                 return ''
         return '<script src="%s"></script>' % self.http.url(
