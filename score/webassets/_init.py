@@ -232,12 +232,15 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             if not any(os.path.getmtime(f) > t for f in os.listdir(folder)):
                 # there aren't any newer files in this folder
                 return 304
-        mimetype, body = loader(request.GET['_v'])
-        return ({
+        hash_ = request.GET.get('_v', None)
+        mimetype, body = loader(hash_)
+        headers = {
             'Content-Type': mimetype,
-            'Etag': hash_,
             'Last-Modified': email.utils.formatdate(),
-        }, body)
+        }
+        if hash_:
+            headers['Etag'] = hash_
+        return (headers, body)
 
     def _get_proxy(self, module, *paths):
         if module not in self.modules:
