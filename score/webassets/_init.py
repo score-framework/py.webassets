@@ -215,15 +215,16 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         proxy = self._get_proxy(module, path)
         url = '/%s/%s' % (module, path)
         hash_ = self.get_asset_hash(module, path)
-        if hash_ and self.rootdir:
-            file = os.path.join(self.rootdir, module, path, hash_)
-            if not os.path.exists(file):
-                os.makedirs(os.path.dirname(file), exist_ok=True)
-                with open(file, 'w') as fp:
-                    fp.write(proxy.mimetype(path))
-                    fp.write('\n')
-                    fp.write(proxy.render(path))
+        if hash_:
             url += '?_v=' + hash_
+            if self.rootdir:
+                file = os.path.join(self.rootdir, module, path, hash_)
+                if not os.path.exists(file):
+                    os.makedirs(os.path.dirname(file), exist_ok=True)
+                    with open(file, 'w') as fp:
+                        fp.write(proxy.mimetype(path))
+                        fp.write('\n')
+                        fp.write(proxy.render(path))
         return url
 
     def get_asset_content(self, module, path):
