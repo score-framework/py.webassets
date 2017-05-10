@@ -31,6 +31,7 @@ import email.utils
 import time
 import hashlib
 from collections import namedtuple
+import re
 
 Request = namedtuple('Request', ('path', 'GET', 'headers'))
 
@@ -128,7 +129,9 @@ class ConfiguredWebassetsModule(ConfiguredModule):
     def _generate_script_tag(self, module, *paths):
         if not paths:
             proxy = self._get_proxy(module)
-            paths = list(sorted(proxy.iter_paths()))
+            regex = re.compile(r'(^|/)_')
+            paths = list(sorted(path for path in proxy.iter_paths()
+                                if not regex.search(path)))
             if not paths:
                 return ''
         else:
