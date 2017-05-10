@@ -90,7 +90,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
 
     def _register_tpl_globals(self):
         self.tpl.filetypes['text/html'].add_global(
-            'webassets_link', self._generate_script_tag, escape=False)
+            'webassets_link', self._generate_html_tag, escape=False)
         self.tpl.filetypes['text/html'].add_global(
             'webassets_content', self.get_bundle_content, escape=False)
 
@@ -126,7 +126,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             (module, score._modules[module].score_webassets_proxy())
             for module in self.modules)
 
-    def _generate_script_tag(self, module, *paths):
+    def _generate_html_tag(self, module, *paths):
         if not paths:
             proxy = self._get_proxy(module)
             regex = re.compile(r'(^|/)_')
