@@ -144,11 +144,17 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             raise ValueError('No paths provided')
         if isinstance(self.freeze, str):
             return self.freeze
-        hashes = []
+        elif self.freeze:
+            key = '%s/bundle\0%s' % (module, '\0'.join(paths))
+            try:
+                return self._frozen_versions[key]
+            except KeyError:
+                proxy = self._get_proxy(module, *paths)
+                hash_ = proxy.bundle_hash(paths)
+                self._frozen_versions[key] = hash_
+                return hash_
         proxy = self._get_proxy(module, *paths)
-        for path in sorted(paths):
-            hashes.append(proxy.hash(path))
-        return hashlib.sha256('\0'.join(hashes).encode('UTF-8')).hexdigest()
+        return proxy.bundle_hash(paths)
 
     def get_bundle_name(self, module, paths):
         if not paths:

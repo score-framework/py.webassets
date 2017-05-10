@@ -1,5 +1,6 @@
 import abc
 from score.tpl import TemplateNotFound
+import hashlib
 
 
 class WebassetsProxy(abc.ABC):
@@ -30,6 +31,12 @@ class WebassetsProxy(abc.ABC):
     @abc.abstractmethod
     def create_bundle(self, paths):
         pass
+
+    def bundle_hash(self, paths):
+        hashes = []
+        for path in sorted(paths):
+            hashes.append(self.hash(path))
+        return hashlib.sha256('\0'.join(hashes).encode('UTF-8')).hexdigest()
 
     @abc.abstractmethod
     def bundle_mimetype(self, paths):
