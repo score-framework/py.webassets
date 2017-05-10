@@ -55,10 +55,7 @@ def init(confdict, http=None, tpl=None):
     conf = dict(defaults.items())
     conf.update(confdict)
     modules = parse_list(conf['modules'])
-    if not conf['rootdir']:
-        raise ConfigurationError(
-            'score.webassets', 'No rootdir configured')
-    if not os.path.exists(conf['rootdir']):
+    if conf['rootdir'] and not os.path.exists(conf['rootdir']):
         raise ConfigurationError(
             'score.webassets', 'Configured rootdir does not exist')
     try:
@@ -167,6 +164,9 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             raise ValueError('No paths provided')
         if len(paths) == 1:
             return self.get_asset_url(module, paths[0])
+        if not self.rootdir:
+            raise RuntimeError(
+                'Cannot generate bundle url: no rootdir configured')
         bundle_name = self.get_bundle_name(module, paths)
         bundle_hash = self.get_bundle_hash(module, paths)
         file = os.path.join(self.rootdir, module, bundle_name, bundle_hash)
@@ -199,13 +199,14 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                 self._frozen_versions[key] = hash_
                 return hash_
         else:
-            return None
+            proxy = self._get_proxy(module, path)
+            return proxy.hash(path)
 
     def get_asset_url(self, module, path):
         proxy = self._get_proxy(module, path)
         url = '/%s/%s' % (module, path)
         hash_ = self.get_asset_hash(module, path)
-        if hash_:
+        if hash_ and self.rootdir:
             file = os.path.join(self.rootdir, module, path, hash_)
             if not os.path.exists(file):
                 os.makedirs(os.path.dirname(file), exist_ok=True)
@@ -239,7 +240,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                     return content.split('\n', maxsplit=1)
             else:
                 def loader(hash_=None):
-                    if hash_:
+                    if hash_ and self.rootdir:
                         file = os.path.join(self.rootdir, module, path, hash_)
                         try:
                             content = open(file).read()
@@ -274,7 +275,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                 'Etag': hash_,
                 'Last-Modified': email.utils.formatdate(),
             }, body)
-        if 'If-Modified-Since' in request.headers:
+        if 'If-Modified-Since' in request.headers and self.rootdir:
             t = time.mktime(email.utils.parsedate(
                 request.headers['If-Modified-Since']))
             folder = os.path.join(self.rootdir, module, path)
