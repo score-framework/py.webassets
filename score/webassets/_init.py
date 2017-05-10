@@ -39,6 +39,7 @@ defaults = {
     'rootdir': None,
     'modules': [],
     'freeze': False,
+    'tpl.autobundle': False,
 }
 
 
@@ -63,7 +64,7 @@ def init(confdict, http=None, tpl=None):
     except ValueError:
         freeze = conf['freeze']
     return ConfiguredWebassetsModule(http, tpl, modules, conf['rootdir'],
-                                     freeze)
+                                     freeze, parse_bool(conf['tpl.autobundle']))
 
 
 class ConfiguredWebassetsModule(ConfiguredModule):
@@ -72,13 +73,14 @@ class ConfiguredWebassetsModule(ConfiguredModule):
     <score.init.ConfiguredModule>`.
     """
 
-    def __init__(self, http, tpl, modules, rootdir, freeze):
+    def __init__(self, http, tpl, modules, rootdir, freeze, tpl_autobundle):
         super().__init__(__package__)
         self.http = http
         self.tpl = tpl
         self.modules = modules
         self.rootdir = rootdir
         self.freeze = freeze
+        self.tpl_autobundle = tpl_autobundle
         self._frozen_versions = {}
         if tpl:
             self._register_tpl_globals()
@@ -133,8 +135,15 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                 return ''
         else:
             proxy = self._get_proxy(module, *paths)
-        url = self.http.url(None, 'score.webassets', module, paths)
-        return proxy.render_url(url)
+        if self.tpl_autobundle:
+            url = self.http.url(None, 'score.webassets', module, paths)
+            return proxy.render_url(url)
+        else:
+            parts = []
+            for path in paths:
+                url = self.http.url(None, 'score.webassets', module, [path])
+                parts.append(proxy.render_url(url))
+            return ''.join(parts)
 
     def get_bundle_hash(self, module, paths):
         if not paths:
