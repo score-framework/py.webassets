@@ -89,7 +89,9 @@ class ConfiguredWebassetsModule(ConfiguredModule):
 
     def _register_tpl_globals(self):
         self.tpl.filetypes['text/html'].add_global(
-            'webassets', self._generate_script_tag, escape=False)
+            'webassets_link', self._generate_script_tag, escape=False)
+        self.tpl.filetypes['text/html'].add_global(
+            'webassets_content', self._generate_script_tag, escape=False)
 
     def _register_http_route(self):
         @self.http.newroute('score.webassets', '/_assets/{module}/{path>.*}')
@@ -170,6 +172,10 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         if bundle_hash:
             url += '?_v=' + bundle_hash
         return url
+
+    def get_bundle_content(self, module, paths):
+        proxy = self._get_proxy(module, *paths)
+        return proxy.create_bundle(paths)
 
     def get_asset_hash(self, module, path):
         if isinstance(self.freeze, str):
