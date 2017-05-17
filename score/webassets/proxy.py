@@ -1,16 +1,18 @@
 import abc
 from score.tpl import TemplateNotFound
 import hashlib
+import re
 
 
 class WebassetsProxy(abc.ABC):
 
     @abc.abstractmethod
-    def iter_paths(self):
+    def iter_default_paths(self):
         pass
 
+    @abc.abstractmethod
     def validate_path(self, path):
-        return any((path == valid) for valid in self.iter_paths())
+        pass
 
     @abc.abstractmethod
     def hash(self, path):
@@ -49,8 +51,15 @@ class TemplateWebassetsProxy(WebassetsProxy):
         self.tpl = tpl
         self._mimetype = mimetype
 
-    def iter_paths(self):
-        return self.tpl.iter_paths(mimetype=self._mimetype)
+    def iter_default_paths(self):
+        hidden_regex = re.compile(r'(^|/)_')
+        yield from sorted(
+            path
+            for path in self.tpl.iter_paths(mimetype=self._mimetype)
+            if not hidden_regex.search(path))
+
+    def validate_path(self, path):
+        return path in self.tpl.iter_paths(mimetype=self._mimetype)
 
     def hash(self, path):
         return self.tpl.hash(path)
