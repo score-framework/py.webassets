@@ -63,4 +63,9 @@ setup(
     install_requires=[
         'score.init >= 0.3',
     ],
+    entry_points={
+        'score.cli': [
+            'webassets = score.webassets.cli:main',
+        ],
+    },
 )
