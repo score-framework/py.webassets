@@ -165,9 +165,14 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         return hashlib.sha256('\0'.join(sorted(paths)).encode('UTF-8'))\
             .hexdigest()
 
-    def get_bundle_url(self, module, paths):
-        if not paths:
+    def get_bundle_url(self, module, paths=None):
+        if paths is None:
+            proxy = self._get_proxy(module)
+            paths = list(proxy.iter_default_paths())
+        elif not paths:
             raise ValueError('No paths provided')
+        else:
+            proxy = self._get_proxy(module, *paths)
         if len(paths) == 1:
             return self.get_asset_url(module, paths[0])
         if not self.rootdir:
@@ -176,7 +181,6 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         bundle_name = self.get_bundle_name(module, paths)
         bundle_hash = self.get_bundle_hash(module, paths)
         file = os.path.join(self.rootdir, module, bundle_name, bundle_hash)
-        proxy = self._get_proxy(module, *paths)
         if not os.path.exists(file):
             os.makedirs(os.path.dirname(file), exist_ok=True)
             with open(file, 'w') as fp:
