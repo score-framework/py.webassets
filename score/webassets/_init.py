@@ -127,7 +127,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
     def _generate_html_tag(self, module, *paths):
         if not paths:
             proxy = self._get_proxy(module)
-            paths = proxy.iter_default_paths()
+            paths = list(proxy.iter_default_paths())
             if not paths:
                 return ''
         else:
