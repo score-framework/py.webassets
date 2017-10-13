@@ -36,10 +36,10 @@ Currently it provides two features to be used by others - virtual assets and
 asset versioning - as well as an adaption for the pyramid framework.
 """
 
-from ._init import init, ConfiguredWebassetsModule, AssetNotFound
+from ._init import init, ConfiguredWebassetsModule, AssetNotFound, Request
 from .proxy import TemplateWebassetsProxy, WebassetsProxy
 
 
 __all__ = (
-    'init', 'ConfiguredWebassetsModule', 'AssetNotFound',
+    'init', 'ConfiguredWebassetsModule', 'AssetNotFound', 'Request',
     'TemplateWebassetsProxy', 'WebassetsProxy',)
