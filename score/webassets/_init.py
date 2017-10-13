@@ -193,7 +193,11 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         return url
 
     def get_bundle_content(self, module, *paths):
-        proxy = self._get_proxy(module, *paths)
+        if not paths:
+            proxy = self._get_proxy(module)
+            paths = list(proxy.iter_default_paths())
+        else:
+            proxy = self._get_proxy(module, *paths)
         return proxy.create_bundle(paths)
 
     def get_asset_hash(self, module, path):
