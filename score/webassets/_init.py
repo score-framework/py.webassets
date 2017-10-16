@@ -325,9 +325,17 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                 path = paths[0]
             raise AssetNotFound(module, path)
         proxy = self.proxies[module]
+        if not hasattr(self, '_proxy_valid_paths'):
+            self._proxy_valid_paths = {}
+        if proxy not in self._proxy_valid_paths:
+            self._proxy_valid_paths[proxy] = []
+        valid_paths = self._proxy_valid_paths[proxy]
         for path in paths:
+            if path in valid_paths:
+                continue
             if not proxy.validate_path(path):
                 raise AssetNotFound(module, path)
+            valid_paths.append(path)
         return proxy
 
 
