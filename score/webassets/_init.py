@@ -127,7 +127,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
     def _generate_html_tag(self, module, *paths):
         if not paths:
             proxy = self._get_proxy(module)
-            paths = list(proxy.iter_default_paths())
+            paths = self._get_proxy_default_paths(proxy)
             if not paths:
                 return ''
         else:
@@ -141,6 +141,13 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                 url = self.http.url(None, 'score.webassets', module, [path])
                 parts.append(proxy.render_url(url))
             return ''.join(parts)
+
+    def _get_proxy_default_paths(self, proxy):
+        if not hasattr(self, '_proxy_default_paths'):
+            self._proxy_default_paths = {}
+        if proxy not in self._proxy_default_paths:
+            self._proxy_default_paths[proxy] = list(proxy.iter_default_paths())
+        return self._proxy_default_paths[proxy]
 
     def get_bundle_hash(self, module, paths):
         if not paths:
@@ -168,7 +175,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
     def get_bundle_url(self, module, paths=None):
         if paths is None:
             proxy = self._get_proxy(module)
-            paths = list(proxy.iter_default_paths())
+            paths = self._get_proxy_default_paths(proxy)
         elif not paths:
             raise ValueError('No paths provided')
         else:
