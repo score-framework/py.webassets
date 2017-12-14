@@ -143,6 +143,8 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             return ''.join(parts)
 
     def _get_proxy_default_paths(self, proxy):
+        if not self.freeze:
+            return list(proxy.iter_default_paths())
         if not hasattr(self, '_proxy_default_paths'):
             self._proxy_default_paths = {}
         if proxy not in self._proxy_default_paths:
@@ -325,17 +327,22 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                 path = paths[0]
             raise AssetNotFound(module, path)
         proxy = self.proxies[module]
-        if not hasattr(self, '_proxy_valid_paths'):
-            self._proxy_valid_paths = {}
-        if proxy not in self._proxy_valid_paths:
-            self._proxy_valid_paths[proxy] = []
-        valid_paths = self._proxy_valid_paths[proxy]
-        for path in paths:
-            if path in valid_paths:
-                continue
-            if not proxy.validate_path(path):
-                raise AssetNotFound(module, path)
-            valid_paths.append(path)
+        if self.freeze:
+            if not hasattr(self, '_proxy_valid_paths'):
+                self._proxy_valid_paths = {}
+            if proxy not in self._proxy_valid_paths:
+                self._proxy_valid_paths[proxy] = []
+            valid_paths = self._proxy_valid_paths[proxy]
+            for path in paths:
+                if path in valid_paths:
+                    continue
+                if not proxy.validate_path(path):
+                    raise AssetNotFound(module, path)
+                valid_paths.append(path)
+        else:
+            for path in paths:
+                if not proxy.validate_path(path):
+                    raise AssetNotFound(module, path)
         return proxy
 
 
