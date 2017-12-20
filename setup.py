@@ -34,7 +34,7 @@ with open(os.path.join(here, 'README.rst')) as f:
 
 setup(
     name='score.webassets',
-    version='0.3.8',
+    version='0.3.9',
     description='Web assets management for The SCORE Framework',
     long_description=README,
     author='strg.at',
