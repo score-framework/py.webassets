@@ -1,186 +1,69 @@
 .. module:: score.webassets
-.. role:: default
 .. role:: confkey
+.. role:: confdefault
 
 ***************
 score.webassets
 ***************
 
 The aim of this module is to provide an infrastructure for handling assets in
-a web project. An :term:`asset` is a static resource that is required by the
-web application, like a javascript file, or css definitions.
+a web project. An :term:`asset` is a supplementary resource required by the web
+application, like a javascript file, or css definitions.
 
 Quickstart
 ==========
 
-.. note::
+Configure a folder, where this module should store all created :term:`bundles
+<asset bundle>` and the provide a list of modules, to provide as web assets:
 
-    You can study the source of the :mod:`score.css` or :mod:`score.js` for a
-    more code-centered introduction to this module.
+.. code-block:: ini
 
-Let's assume, we want to integrate many small video files into our
-applications. In fact, they are so common on the page, that they should be
-properly versioned and cached. And we already have a :ref:`route <http_router>`
-for delivering our video files:
+    [score.init]
+    modules =
+        score.ctx
+        score.http
+        score.css
+        score.js
+        score.webassets
 
-.. code-block:: python
+    [webassets]
+    rootdir = ${here}/_bundles
+    modules =
+        css
+        js
 
-    @router.route('video', '/video/{path>.*}')
-    def video(ctx, path):
-        file = path2file(ctx, path)
-        ctx.http.response.body_iter = open(file)
+You can now include your css and javascript assets in your html templates. The
+next fragment is in jinja2 format:
 
-Let's first add a version to every URL by adding a :ref:`URL converter
-<http_url_conversion>` to the route:
+.. code-block:: jinja
 
-.. code-block:: python
+    <html>
+        <head>
 
-    @video.vars2url
-    def movie_vars2url(ctx, path)
-        url = '/video/' + path
-        file = path2file(ctx, path)
-        versionmanager = ctx.webassets.versionmanager
+            <style>
+                {# Will render the content of the given css file #}
+                {{ webassets_content('css', 'above-the-fold.css') }}
+            </style>
 
-        hasher = versionmanager.create_file_hasher(file)
+            {# Will load *all* css files  with a <link> tag #}
+            {{ webassets_link('css') }}
 
-        def renderer():
-            return open(file, 'rb').read()
+            {# Will load a bundle consiting of two javascript files #}
+            {{ webassets_link('js', 'file1.js', 'file2.js') }}
 
-        hash_ = versionmanager.store('video', path, hasher, renderer)
-        if hash_:
-            url += '?_v=' + hash_
-        return url
+        </head>
+        ...
 
-The URL will always be the same, as long as the content of the video file
-remains unchanged. We can now make use of this fact by telling the browser to
-keep this URL in its cache forever. If the browser asks us, whether the content
-of URL has changed, we can immediately send back the `HTTP status code 304`_.
-We only have to invoke :meth:`VersionManager.handle_request
-<score.webassets.versioning.VersionManager.handle_request>` at the beginning
-of our route for this to happen automatically:
-
-.. code-block:: python
-
-    @router.route('video', '/video/{path>.*}')
-    def video(ctx, path):
-        versionmanager = self.webassets.versionmanager
-        if versionmanager.handle_request(ctx, 'video', path):
-            return
-        file = path2file(ctx, path)
-        ctx.http.response.body_iter = open(file)
-
-.. _HTTP status code 304: https://tools.ietf.org/html/rfc7232#section-4.1
+.. comment:
 
 Configuration
 =============
 
-.. autofunction:: score.webassets.init
+.. autofunction:: init
 
 Details
 =======
 
-Assets
-------
-
-Assets always fall into a :term:`category <asset category>`, which classifies
-a resource. Each category must have a unique name describing it. The module
-handling cascading style sheets, for example, refers to its assets' category
-with the string "css". The one for javascript files, on the other hand, uses
-"js".
-
-Apart from a *category*, an asset also has a :term:`path <asset path>`. Such
-a path is very much like a file system path with the following restrictions:
-
-- file and folder names *must* only contain alphanumeric characters,
-  underscores and hyphens
-- the directory separator is always a slash,
-- it *must not* be absolute (i.e. cannot start with a slash), and 
-- it *must not* contain references to upper folders (like
-  :file:`spam/../bacon.css`).
-
-Each asset category should have a defined *root* folder, where all assets of
-that type reside. This means, for example, that there must be one and only one
-folder containing *css* resources.
-
-When the definition of the *root* folder is in place, individual files can be
-referenced with relative paths to the files. If, for example, we have the
-following file system layout … ::
-
-    css/
-      reset.css
-      frontpage.scss
-      article/
-        main.css.jinja2
-
-… and have defined the folder :file:`css` as the *root* of all assets
-belonging to the category "css", we could reference three distinct assets with
-the following paths:
-
-- ``reset.css``
-- ``frontpage.scss``
-- ``article/main.css.jinja2``
-
-As we can see in this example, assets do not have to have a uniform file
-extension.
-
-.. _virtual_assets:
-
-Virtual Assets
---------------
-
-Not all assets need to reside on the file system. So called
-:term:`virtual assets <virtual asset>` are assets that have a *category* and a
-*path*, as usual, but no corresponding file in the *root* folder of the
-category they belong to.
-
-Instead, they are registered in source code with a *callback* function that
-generates the content of the asset whenever necessary. This allows developers
-to provide highly flexible assets, that cannot be written in a static manner.
-
-If, for example, one must implement a web application where the colors in the
-frontend are partially defined by editors in the backend, one might use a
-virtual css file for generating the color definitions using a database
-connection or a local `dict` object:
-
->>> def generator():
-...     definitions = []
-...     for article, color in colormap.items():
-...         definitions.append('.article-%d: %s' % (article.id, color))
-...     return '\n'.join(definitions)
-... 
->>> virtualassets.register('article-colors.css', generator)
-
-The class :class:`score.webassets.VirtualAssets` provides a container for the
-virtual assets of a given category.
-
-Hidden Assets
--------------
-
-An *asset*, whether *virtual* or not, is considered *hidden*, if its file name
-starts with an underscore. It is also considered *hidden*, if it resides in a
-folder that is hidden.
-
-*Hidden* assets behave exactly like ordinary [virtual] assets, but functions
-operating on *all* assets of a given type will skip *hidden* assets by
-default.
-
-This feature can be exploited to mark assets that are only required in certain
-circumstances. One good example are Internet Explorer-Specific style sheets.
-When using our :mod:`score.css` module, for example, one might write::
-
-    <html>
-        <head>
-            <!-- The next line includes *all* css files, except those
-                 that are *hidden*, as described above -->
-            {{ css() }}
-            <!--[if IE]>
-                <!-- The next line only includes the file "_ie/common.css",
-                     which was skipped above, because it is considered
-                     *hidden*, as it resides in a hidden folder (i.e. one
-                     whose name starts with an underscore) -->
-                {{ css('_ie/common.css') }}
-            <![endif]-->
-        </head>
 
 .. _webassets_versioning:
 
@@ -204,11 +87,11 @@ would use just this URL, the browser would need to check back every once in a
 while to see if this resource has changed. It would thus request the resource
 much more often than necessary.
 
-If we instead add a version string to the URL, we can tell the browser to
+If we instead add a "version string" to the URL, we can tell the browser to
 cache this resource forever. When the resource changes, we change the URL and
 point to the new URL in our HTML.
 
-The initial version of the resource might now have the URL
+The initial "version" of the resource might now have the URL
 http://example.com/css/colors.css?version=1. When a browser requests this URL,
 we send all required HTTP headers that tell the browser that the resource
 found in this URL will *never* change.
@@ -230,11 +113,139 @@ assumes that it must be a different asset (which it technically is) and
 requests its contents. We, again, tell it to keep this file forever and to
 never ask the web server again for this exact URL.
 
-This feature is implemented in the class
-:class:`score.webassets.versioning.VersionManager`. It does not use incremental
-values as version strings, though, as the class cannot know when the number
-needs to be incremented. Instead, it operates on hashed value, like the hashed
-timestamps of the asset files.
+This feature is automatically enabled, although it does not use incremental
+values as "version strings", as in the examples above. Instead, it operates
+using hashes of the asset contents. That's why they are referred to as
+:term:`asset hashes <asset hash>` throughout the documentation.
+
+
+.. _webassets_freezing:
+
+Asset Freezing
+--------------
+
+Normally, the webassets module will determine the asset hash based on the
+asset's content. Unfortunately, this method is very slow: whenever we need the
+hash of an asset, we will need to render the content of the asset.
+
+To avoid such expensive operations during deployment, the module has two
+different modes for freezing the asset hashes. You can configure
+score.webassets to remember the hash of each asset by passing ``True`` in the
+module's ``freeze`` configuration. This ensures that hashes are calculated at
+most once.
+
+.. code-block:: ini
+
+    [webassets]
+    freeze = True
+
+
+If you have a deployment script, it is even better to pre-calculate the hash
+and to provide that value in the module configuration:
+
+.. code-block:: console
+
+    $ score webassets freeze
+    b18ed2b601ab3850
+
+.. code-block:: ini
+
+    [webassets]
+    freeze = b18ed2b601ab3850
+
+
+.. _webassets_proxy:
+
+Proxy
+-----
+
+.. note::
+
+    The intended audience of this section is module developers. This is the
+    reason the next few suggestions may seem a bit too abstract for day to day
+    usage.
+
+Every module that wants to provide web assets through this module must
+return a sub-class of :class:`WebassetsProxy` from the configured module's
+``score_webassets_proxy()`` function.
+
+As an example, we will assume that we want to build a module called
+"myobjects", that can grant access to javascript objects stored in JSON files.
+We will be accessing the objects one by one, but may occasionally need to
+retrieve multiple objects at once.
+
+To provide these objects as web assets, we need to create a proxy object. We
+will use the simpler :class:`TemplateWebassetsProxy` to keep the example code
+short:
+
+.. code-block:: python
+
+    from score.webassets import TemplateWebassetsProxy
+
+    class MyobjectsWebassets(TemplateWebassetsProxy):
+
+        def __init__(self, tpl):
+            super().__init__(tpl, 'application/json')
+
+        def render_url(self, url):
+            return '''
+                <script>
+                    (function() {
+                        var url = JSON.decode(%s);
+                        fetch(url).then(function(response) {
+                            return response.json();
+                        }).then(function(result) {
+                            myGlobalObjectStorage.add(result);
+                        });
+                    })();
+                </script>
+            ''' % (json.dumps(url),)
+
+        def create_bundle(self, paths):
+            return ''.join(map(self.render, paths))
+
+Your configured module must now return an instance of this class in its
+``score_webassets_proxy()`` method:
+
+.. code-block:: python
+
+    from score.init import ConfiguredModule
+
+    class ConfiguredMyobjectsModule(ConfiguredModule)
+
+        def __init__(self, tpl):
+            self.tpl = tpl  # a score.tpl dependency
+            super().__init__('myobjects')
+
+        def score_webassets_proxy(self):
+            return MyobjectsWebassets(self.tpl)
+
+After configuring score.webassets to include this module, you can make use of
+your new module inside html templates. The next fragment is in jinja2 format:
+
+.. code-block:: jinja
+
+    <html>
+        <head>
+
+            <script>
+                // some code initializing myGlobalObjectStorage
+            </script>
+
+            {# lazy-loading all assets #}
+            {{ webassets_link('myobjects') }}
+
+            {# embedding asset content directly #}
+            <script>
+                (function() {
+                    myGlobalObjectStorage.add(JSON.decode(
+                        {{ webassets_content('myobjects') }}
+                    ));
+                })();
+            </script>
+
+        </head>
+        ...
 
 API
 ===
@@ -242,43 +253,29 @@ API
 Configuration
 -------------
 
-.. autofunction:: score.webassets.init
+.. autofunction:: init
 
-.. autoclass:: score.webassets.ConfiguredWebassetsModule()
-
-    .. attribute:: cachedir
-
-        The cache folder that can be used by other modules. A Module using
-        this value should first create a sub-folder with its
-        :term:`category string <asset category>`.
-
-    .. attribute:: versionmanager
-
-        The :class:`score.webassets.versioning.VersionManager` object to use
-        for asset versioning.
-
-.. autoexception:: score.webassets.AssetNotFound
-
-Virtual Assets
---------------
-
-.. autoclass:: score.webassets.VirtualAssets
+.. autoclass:: ConfiguredWebassetsModule()
     :members:
 
-Version Management
-------------------
+Helpers
+-------
 
-The asset versioning is implemented in the package
-`score.webassets.versioning`.
+.. class:: Request
 
-.. automodule:: score.webassets.versioning
+    A :func:`collections.namedtuple` describing the parts of HTTP request, that
+    are required for :meth:`ConfiguredWebassetsModule.get_request_response` to
+    work. It consists of these 3 values:
 
-.. autoclass:: score.webassets.versioning.VersionManager
+    - **path**: The path_ section of the requested URL.
+    - **GET**: Parsed `dict` of the query part.
+    - **headers**: Another `dict` containing all headers, the client provided.
+
+    .. _path: https://en.wikipedia.org/wiki/URL#Syntax
+
+.. autoclass:: WebassetsProxy
     :members:
 
-.. autoclass:: score.webassets.versioning.Dummy()
+.. autoclass:: TemplateWebassetsProxy
 
-.. autoclass:: score.webassets.versioning.Frozen
-
-.. autoclass:: score.webassets.versioning.Repository
-
+.. autoexception:: AssetNotFound()

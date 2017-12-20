@@ -1,51 +1,107 @@
 import abc
 from score.tpl import TemplateNotFound
-import hashlib
+import xxhash
 import re
 
 
 class WebassetsProxy(abc.ABC):
+    """
+    A proxy object defining the behaviour of a type of web asset.
+    """
 
     @abc.abstractmethod
     def iter_default_paths(self):
-        pass
+        """
+        Provide a generator iterating over the paths, that should be used if no
+        explicit path list was given.
+        """
 
     @abc.abstractmethod
     def validate_path(self, path):
-        pass
+        """
+        Test if a *path* is valid, i.e. if it can be passed to :meth:`render`.
+        """
 
     @abc.abstractmethod
     def hash(self, path):
-        pass
+        """
+        Returns a hash for *path*, that will change whenever the rendered
+        content of the asset changes.
+        """
 
     @abc.abstractmethod
     def render(self, path):
-        pass
+        """
+        Provides the content of the asset with given *path*.
+        """
 
     @abc.abstractmethod
     def mimetype(self, path):
-        pass
+        """
+        Returns the mime type of the asset with given *path*.
+        """
 
     @abc.abstractmethod
     def render_url(self, url):
-        pass
+        """
+        Returns the string to embed in an HTML document to load given *url*.
+        This might be a <link> tag for css assets, or a <script> tag for
+        javascript assets.
+        """
 
     @abc.abstractmethod
     def create_bundle(self, paths):
-        pass
+        """
+        Returns a string containing the contents of multiple assets identified
+        by their given *paths*.
+        """
 
     def bundle_hash(self, paths):
-        hashes = []
+        """
+        Provides the hash of the bundle with given *paths*.
+        """
+        hash = xxhash.xxh64()
         for path in sorted(paths):
-            hashes.append(self.hash(path))
-        return hashlib.sha256('\0'.join(hashes).encode('UTF-8')).hexdigest()
+            part = self.hash(path)
+            if part:
+                hash.update(part.encode('UTF-8'))
+            hash.update(b'\0')
+        return hash.hexdigest()
 
     @abc.abstractmethod
     def bundle_mimetype(self, paths):
-        pass
+        """
+        Returns the mime type of the bundle consisting of given *paths*.
+        """
 
 
 class TemplateWebassetsProxy(WebassetsProxy):
+    """
+    A type of :class:`WebassetsProxy` that treats templates like assets. It
+    accepts a configured :mod:`score.tpl` module and a mime type string and will
+    provide almost all templates, that the tpl module knows of, as assets. If
+    the tpl module knows of css files, for example, this class can be used to
+    provide these css files as assets.
+
+    The default path list--as returned by :meth:`iter_default_paths
+    <WebassetsProxy.iter_default_paths>`--will omit all files starting with
+    underscore and all files inside folders that start with an underscore.
+    Assuming the tpl module lists the following template paths ...
+
+    ::
+
+        banana.css
+        _orange.css
+        fresh/
+            banana.css
+            _apple.css
+        _old/
+            pear.css
+            passion-fruit.css
+
+    ... only ``banana.css`` and ``fresh/banana.css`` will be returned by
+    :meth:`iter_default_paths <WebassetsProxy.iter_default_paths>`.
+    """
 
     def __init__(self, tpl, mimetype):
         self.tpl = tpl

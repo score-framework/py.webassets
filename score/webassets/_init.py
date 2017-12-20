@@ -29,7 +29,7 @@ from score.init import (
 import os
 import email.utils
 import time
-import hashlib
+import xxhash
 from collections import namedtuple
 
 Request = namedtuple('Request', ('path', 'GET', 'headers'))
@@ -47,10 +47,26 @@ def init(confdict, http=None, tpl=None):
     Initializes this module acoording to :ref:`our module initialization
     guidelines <module_initialization>` with the following configuration keys:
 
-    :confkey:`netfs` :default:`True`
-        The initializer will upload all webassets to a :mod:`score.netfs`
-        server, if one was configured. You can disable this feature by passing a
-        `False` value here
+    :confkey:`rootdir` :confdefault:`None`
+        The folder where this module will store the bundled assets.
+
+    :confkey:`modules` :confdefault:`[]`
+        A list of configured score modules to retrieve proxy objects from. The
+        configured modules listed here must all expose a
+        ``score_webassets_proxy()`` method, that returns a
+        :class:`WebassetsProxy` object.
+
+    :confkey:`freeze` :confdefault:`False`
+        Option for speeding up :term:`asset hash` calculations.
+
+        See :ref:`webassets_freezing` for valid values.
+
+    :confkey:`tpl.autobundle` :confdefault:`False`
+        Whether the webassets_* functions registered with :mod:`score.tpl`
+        should provide :term:`bundles <asset bundle>` instead of separate files.
+        This should be set to `True` on deployment systems to speed up web page
+        rendering.
+
     """
     conf = dict(defaults.items())
     conf.update(confdict)
@@ -90,7 +106,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         self.tpl.filetypes['text/html'].add_global(
             'webassets_link', self._generate_html_tag, escape=False)
         self.tpl.filetypes['text/html'].add_global(
-            'webassets_content', self.get_bundle_content, escape=False)
+            'webassets_content', self._generate_html_content, escape=False)
 
     def _register_http_route(self):
         @self.http.newroute('score.webassets', '/_assets/{module}/{path>.*}')
@@ -142,6 +158,11 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                 parts.append(proxy.render_url(url))
             return ''.join(parts)
 
+    def _generate_html_content(self, module, *paths):
+        if not paths:
+            paths = None
+        return self.get_bundle_content(module, paths)
+
     def _get_proxy_default_paths(self, proxy):
         if not self.freeze:
             return list(proxy.iter_default_paths())
@@ -151,8 +172,114 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             self._proxy_default_paths[proxy] = list(proxy.iter_default_paths())
         return self._proxy_default_paths[proxy]
 
-    def get_bundle_hash(self, module, paths):
-        if not paths:
+    def get_asset_content(self, module, path):
+        """
+        Returns the content of the asset identified my its *module* and *path*.
+        """
+        proxy = self._get_proxy(module, path)
+        return proxy.render(path)
+
+    def get_asset_mimetype(self, module, path):
+        """
+        Returns the mime type of the asset identified my its *module* and
+        *path*.
+        """
+        proxy = self._get_proxy(module, path)
+        return proxy.mimetype(path)
+
+    def get_asset_hash(self, module, path):
+        """
+        Provides the :term:`hash <asset hash>` of the asset identified my its
+        *module* and *path*.
+        """
+        if isinstance(self.freeze, str):
+            return self.freeze
+        elif self.freeze:
+            key = '%s/%s' % (module, path)
+            try:
+                return self._frozen_versions[key]
+            except KeyError:
+                proxy = self._get_proxy(module, path)
+                hash_ = proxy.hash(path)
+                self._frozen_versions[key] = hash_
+                return hash_
+        else:
+            proxy = self._get_proxy(module, path)
+            return proxy.hash(path)
+
+    def get_asset_url(self, module, path):
+        """
+        Returns the relative URL to the asset identified by its *module* and
+        *path*, that this module can resolve via :meth:`get_request_response`.
+
+        You won't need this function, if you're using :mod:`score.http`. But if
+        your means of deployment is different, you will want to create URLs to
+        your assets using this function. It will look something like this::
+
+            /css/reset.css?_v=0b2931cc6255c72e
+
+        This should be rewritten to something you can detect in your
+        application::
+
+            /_score_webassets/css/reset.css?_v=0b2931cc6255c72e
+
+        Whenever a URL starting with your custom prefix is requested, you can
+        pass the modified :class:`Request` with the original URL to
+        :meth:`get_request_response`:
+
+        .. code-block:: python
+
+            response = webassets.get_request_response(Request(
+                '/css/reset.css',
+                {'_v': '0b2931cc6255c72e'},
+                {'Accept-Encoding': 'gzip,deflate',
+                 'Referer': ... }
+            ))
+        """
+        proxy = self._get_proxy(module, path)
+        url = '/%s/%s' % (module, path)
+        hash_ = self.get_asset_hash(module, path)
+        if hash_:
+            url += '?_v=' + hash_
+            if self.rootdir:
+                file = os.path.join(self.rootdir, module, path, hash_)
+                if not os.path.exists(file):
+                    os.makedirs(os.path.dirname(file), exist_ok=True)
+                    with open(file, 'w') as fp:
+                        fp.write(proxy.mimetype(path))
+                        fp.write('\n')
+                        fp.write(proxy.render(path))
+        return url
+
+    def get_bundle_name(self, module, paths=None):
+        """
+        Provides a unique name for a :term:`bundle <asset bundle>` consisting of
+        assets found in given *module* and given *paths*. Will use the module's
+        :meth:`default paths <WebassetsProxy.iter_default_paths>`, if the latter
+        is omitted.
+
+        This feature is used internally for storing different bundles inside the
+        same folder, for example.
+        """
+        if paths is None:
+            proxy = self._get_proxy(module)
+            paths = self._get_proxy_default_paths(proxy)
+        elif not paths:
+            raise ValueError('No paths provided')
+        return xxhash.xxh64('\0'.join(sorted(paths)).encode('UTF-8'))\
+            .hexdigest()
+
+    def get_bundle_hash(self, module, paths=None):
+        """
+        Provides the :term:`hash <asset hash>` of a :term:`bundle <asset
+        bundle>` consisting of assets found in given *module* and given *paths*.
+        Will use the module's :meth:`default paths
+        <WebassetsProxy.iter_default_paths>`, if the latter is omitted.
+        """
+        if paths is None:
+            proxy = self._get_proxy(module)
+            paths = self._get_proxy_default_paths(proxy)
+        elif not paths:
             raise ValueError('No paths provided')
         if isinstance(self.freeze, str):
             return self.freeze
@@ -168,13 +295,34 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         proxy = self._get_proxy(module, *paths)
         return proxy.bundle_hash(paths)
 
-    def get_bundle_name(self, module, paths):
-        if not paths:
+    def get_bundle_content(self, module, paths=None):
+        """
+        Returns the content of requested :term:`bundle <asset bundle>`. The
+        *module* name is required and will create a bundle with module's
+        :meth:`default paths <WebassetsProxy.iter_default_paths>`. It is also
+        possible to create a bundle with a specific list of :term:`asset paths
+        <asset path>`.
+        """
+        if paths is None:
+            proxy = self._get_proxy(module)
+            paths = list(proxy.iter_default_paths())
+        elif not paths:
             raise ValueError('No paths provided')
-        return hashlib.sha256('\0'.join(sorted(paths)).encode('UTF-8'))\
-            .hexdigest()
+        else:
+            proxy = self._get_proxy(module, *paths)
+        return proxy.create_bundle(paths)
 
     def get_bundle_url(self, module, paths=None):
+        """
+        Returns the relative URL to given :term:`bundle <asset bundle>`, that
+        this module can resolve via :meth:`get_request_response`. The *module*
+        name is required and will create a bundle with module's :meth:`default
+        paths <WebassetsProxy.iter_default_paths>`. It is also possible to
+        create a bundle with a specific list of :term:`asset paths <asset
+        path>`.
+
+        See :meth:`get_asset_url` for example usage.
+        """
         if paths is None:
             proxy = self._get_proxy(module)
             paths = self._get_proxy_default_paths(proxy)
@@ -201,55 +349,16 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             url += '?_v=' + bundle_hash
         return url
 
-    def get_bundle_content(self, module, *paths):
-        if not paths:
-            proxy = self._get_proxy(module)
-            paths = list(proxy.iter_default_paths())
-        else:
-            proxy = self._get_proxy(module, *paths)
-        return proxy.create_bundle(paths)
-
-    def get_asset_hash(self, module, path):
-        if isinstance(self.freeze, str):
-            return self.freeze
-        elif self.freeze:
-            key = '%s/%s' % (module, path)
-            try:
-                return self._frozen_versions[key]
-            except KeyError:
-                proxy = self._get_proxy(module, path)
-                hash_ = proxy.hash(path)
-                self._frozen_versions[key] = hash_
-                return hash_
-        else:
-            proxy = self._get_proxy(module, path)
-            return proxy.hash(path)
-
-    def get_asset_url(self, module, path):
-        proxy = self._get_proxy(module, path)
-        url = '/%s/%s' % (module, path)
-        hash_ = self.get_asset_hash(module, path)
-        if hash_:
-            url += '?_v=' + hash_
-            if self.rootdir:
-                file = os.path.join(self.rootdir, module, path, hash_)
-                if not os.path.exists(file):
-                    os.makedirs(os.path.dirname(file), exist_ok=True)
-                    with open(file, 'w') as fp:
-                        fp.write(proxy.mimetype(path))
-                        fp.write('\n')
-                        fp.write(proxy.render(path))
-        return url
-
-    def get_asset_content(self, module, path):
-        proxy = self._get_proxy(module, path)
-        return proxy.render(path)
-
-    def get_asset_mimetype(self, module, path):
-        proxy = self._get_proxy(module, path)
-        return proxy.mimetype(path)
-
     def get_request_response(self, request):
+        """
+        Provides the most efficient response to an HTTP :class:`Request` to
+        obtain an asset. The return value is either a single `int`, denoting an
+        HTTP status code (like 404 or 304), or a 2-tuple ``(headers, body)``.
+        The *headers* list in the latter case is a `dict` mapping header names
+        to their values, whereas the *body* is just a string. Note that none of
+        the return values are formatted in any way. They will need to be
+        properly encoded (which should happen automatically in most frameworks).
+        """
         try:
             module, path = request.path.lstrip('/').split('/', maxsplit=1)
             if path.startswith('__bundle_') and path.endswith('__'):
@@ -351,8 +460,8 @@ class AssetNotFound(Exception):
     Thrown when an asset was requested, but not found. Web applications might
     want to return the HTTP status code 404 in this case.
 
-    Assets are uniquely identified by the combination of a :term:`category
-    <asset category>` string and a :term:`path <asset path>`.
+    Assets are uniquely identified by the combination of their :term:`module
+    <asset module>` name and a :term:`path <asset path>`.
     """
 
     def __init__(self, module, path):
