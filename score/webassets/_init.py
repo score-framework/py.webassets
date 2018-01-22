@@ -386,10 +386,12 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             return 404, {}, ''
 
     def _get_common_response(self, request, module, path, loader):
+        headers = dict((key.lower(), value)
+                       for key, value in request.headers.items())
         if '_v' in request.GET:
             can_send_304 = (
-                'If-None-Match' in request.headers or
-                'If-Modified-Since' in request.headers)
+                'if-none-match' in headers or
+                'if-modified-since' in headers)
             # it really doesn't matter what the values of these headers are,
             # they merely indicate that the resource was requested by the client
             # earlier and it is now checking for changes. but since assets with
@@ -407,9 +409,9 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                 'Etag': hash_,
                 'Last-Modified': email.utils.formatdate(),
             }, body
-        if 'If-Modified-Since' in request.headers and self.rootdir:
+        if 'if-modified-since' in headers and self.rootdir:
             t = time.mktime(email.utils.parsedate(
-                request.headers['If-Modified-Since']))
+                headers['if-modified-since']))
             folder = os.path.join(self.rootdir, module, path)
             try:
                 if not any(os.path.getmtime(f) > t for f in os.listdir(folder)):
