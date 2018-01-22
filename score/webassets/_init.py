@@ -141,7 +141,10 @@ class ConfiguredWebassetsModule(ConfiguredModule):
     def _generate_html_tag(self, module, *paths):
         if not paths:
             proxy = self._get_proxy(module)
-            paths = self._get_proxy_default_paths(proxy)
+            if self.tpl_autobundle:
+                paths = self._get_proxy_default_bundle_paths(proxy)
+            else:
+                paths = self._get_proxy_default_paths(proxy)
             if not paths:
                 return ''
         else:
@@ -167,8 +170,19 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         if not hasattr(self, '_proxy_default_paths'):
             self._proxy_default_paths = {}
         if proxy not in self._proxy_default_paths:
-            self._proxy_default_paths[proxy] = list(proxy.iter_default_paths())
+            iterator = proxy.iter_default_paths()
+            self._proxy_default_paths[proxy] = list(iterator)
         return self._proxy_default_paths[proxy]
+
+    def _get_proxy_default_bundle_paths(self, proxy):
+        if not self.freeze:
+            return list(proxy.iter_default_bundle_paths())
+        if not hasattr(self, '_proxy_default_bundle_paths'):
+            self._proxy_default_bundle_paths = {}
+        if proxy not in self._proxy_default_bundle_paths:
+            iterator = proxy.iter_default_bundle_paths()
+            self._proxy_default_bundle_paths[proxy] = list(iterator)
+        return self._proxy_default_bundle_paths[proxy]
 
     def get_asset_content(self, module, path):
         """
@@ -253,15 +267,15 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         """
         Provides a unique name for a :term:`bundle <asset bundle>` consisting of
         assets found in given *module* and given *paths*. Will use the module's
-        :meth:`default paths <WebassetsProxy.iter_default_paths>`, if the latter
-        is omitted.
+        :meth:`default paths <WebassetsProxy.iter_default_bundle_paths>`, if the
+        latter is omitted.
 
         This feature is used internally for storing different bundles inside the
         same folder, for example.
         """
         if paths is None:
             proxy = self._get_proxy(module)
-            paths = self._get_proxy_default_paths(proxy)
+            paths = self._get_proxy_default_bundle_paths(proxy)
         elif not paths:
             raise ValueError('No paths provided')
         return xxhash.xxh64('\0'.join(sorted(paths)).encode('UTF-8'))\
@@ -272,11 +286,11 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         Provides the :term:`hash <asset hash>` of a :term:`bundle <asset
         bundle>` consisting of assets found in given *module* and given *paths*.
         Will use the module's :meth:`default paths
-        <WebassetsProxy.iter_default_paths>`, if the latter is omitted.
+        <WebassetsProxy.iter_default_bundle_paths>`, if the latter is omitted.
         """
         if paths is None:
             proxy = self._get_proxy(module)
-            paths = self._get_proxy_default_paths(proxy)
+            paths = self._get_proxy_default_bundle_paths(proxy)
         elif not paths:
             raise ValueError('No paths provided')
         if isinstance(self.freeze, str):
@@ -297,13 +311,13 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         """
         Returns the content of requested :term:`bundle <asset bundle>`. The
         *module* name is required and will create a bundle with module's
-        :meth:`default paths <WebassetsProxy.iter_default_paths>`. It is also
-        possible to create a bundle with a specific list of :term:`asset paths
-        <asset path>`.
+        :meth:`default paths <WebassetsProxy.iter_default_bundle_paths>`. It is
+        also possible to create a bundle with a specific list of :term:`asset
+        paths <asset path>`.
         """
         if paths is None:
             proxy = self._get_proxy(module)
-            paths = list(proxy.iter_default_paths())
+            paths = list(proxy.iter_default_bundle_paths())
         elif not paths:
             raise ValueError('No paths provided')
         else:
@@ -315,15 +329,15 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         Returns the relative URL to given :term:`bundle <asset bundle>`, that
         this module can resolve via :meth:`get_request_response`. The *module*
         name is required and will create a bundle with module's :meth:`default
-        paths <WebassetsProxy.iter_default_paths>`. It is also possible to
-        create a bundle with a specific list of :term:`asset paths <asset
+        paths <WebassetsProxy.iter_default_bundle_paths>`. It is also possible
+        to create a bundle with a specific list of :term:`asset paths <asset
         path>`.
 
         See :meth:`get_asset_url` for example usage.
         """
         if paths is None:
             proxy = self._get_proxy(module)
-            paths = self._get_proxy_default_paths(proxy)
+            paths = self._get_proxy_default_bundle_paths(proxy)
         elif not paths:
             raise ValueError('No paths provided')
         else:

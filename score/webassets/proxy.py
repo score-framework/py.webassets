@@ -16,6 +16,13 @@ class WebassetsProxy(abc.ABC):
         explicit path list was given.
         """
 
+    def iter_default_bundle_paths(self):
+        """
+        Provide a generator iterating over the paths, that should be used for a
+        bundle if no explicit path list was given.
+        """
+        return self.iter_default_paths()
+
     @abc.abstractmethod
     def validate_path(self, path):
         """
