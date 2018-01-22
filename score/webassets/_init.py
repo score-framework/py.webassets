@@ -112,17 +112,15 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         @self.http.newroute('score.webassets', '/_assets/{module}/{path>.*}')
         def webassets(ctx, module, paths):
             request = ctx.http.request
-            result = self.get_request_response(Request(
+            status, headers, body = self.get_request_response(Request(
                 '/' + request.path.lstrip('/').split('/', maxsplit=1)[1],
                 request.GET,
                 request.headers,
             ))
-            if isinstance(result, int):
-                ctx.http.response.status = result
-            else:
-                for header, value in result[0].items():
-                    ctx.http.response.headers[header] = value
-                ctx.http.response.text = result[1]
+            ctx.http.response.status = status
+            for header, value in headers.items():
+                ctx.http.response.headers[header] = value
+            ctx.http.response.text = body
 
         @webassets.vars2url
         def webassets_vars2url(ctx, module, paths):
@@ -229,7 +227,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
 
         .. code-block:: python
 
-            response = webassets.get_request_response(Request(
+            status, headers, body = webassets.get_request_response(Request(
                 '/css/reset.css',
                 {'_v': '0b2931cc6255c72e'},
                 {'Accept-Encoding': 'gzip,deflate',
@@ -352,8 +350,9 @@ class ConfiguredWebassetsModule(ConfiguredModule):
     def get_request_response(self, request):
         """
         Provides the most efficient response to an HTTP :class:`Request` to
-        obtain an asset. The return value is either a single `int`, denoting an
-        HTTP status code (like 404 or 304), or a 2-tuple ``(headers, body)``.
+        obtain an asset. The return value is 3-tuple ``(status, headers, body)``
+        containing an HTTP status code, a `dict` of HTTP headers and the
+        response body.
         The *headers* list in the latter case is a `dict` mapping header names
         to their values, whereas the *body* is just a string. Note that none of
         the return values are formatted in any way. They will need to be
@@ -384,7 +383,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                     return proxy.mimetype(path), proxy.render(path)
             return self._get_common_response(request, module, path, loader)
         except AssetNotFound:
-            return 404
+            return 404, {}, ''
 
     def _get_common_response(self, request, module, path, loader):
         if '_v' in request.GET:
@@ -396,18 +395,18 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             # earlier and it is now checking for changes. but since assets with
             # hashes are immutable, we can always respond with 304.
             if can_send_304:
-                return 304
+                return 304, {}, ''
             hash_ = request.GET['_v']
             try:
                 mimetype, body = loader(hash_)
             except FileNotFoundError:
                 raise AssetNotFound(module, path)
-            return ({
+            return 200, {
                 'Content-Type': mimetype,
                 'Cache-Control': 'max-age=' + str(60 * 60 * 24 * 30 * 12),
                 'Etag': hash_,
                 'Last-Modified': email.utils.formatdate(),
-            }, body)
+            }, body
         if 'If-Modified-Since' in request.headers and self.rootdir:
             t = time.mktime(email.utils.parsedate(
                 request.headers['If-Modified-Since']))
@@ -415,7 +414,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             try:
                 if not any(os.path.getmtime(f) > t for f in os.listdir(folder)):
                     # there aren't any newer files in this folder
-                    return 304
+                    return 304, {}, ''
             except FileNotFoundError:
                 # folder does not exist, ignore
                 pass
@@ -427,7 +426,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         }
         if hash_:
             headers['Etag'] = hash_
-        return (headers, body)
+        return 200, headers, body
 
     def _get_proxy(self, module, *paths):
         if module not in self.modules:
