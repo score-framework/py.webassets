@@ -101,26 +101,26 @@ def bundle_url(clickctx, module, paths):
 
 
 @main.command('bundle-hash')
+@click.option('-f', '--force-calculation', 'force_calculation', is_flag=True)
 @click.argument('module', required=False)
 @click.argument('paths', nargs=-1)
 @click.pass_context
-def bundle_hash(clickctx, module, paths):
+def bundle_hash(clickctx, module, paths, force_calculation):
     """
-    Provides the real bundle hashes.
+    Provides bundle hashes.
     """
     webassets = clickctx.obj['conf'].load('webassets')
+    if force_calculation:
+        webassets.freeze = False
+    if not paths:
+        paths = None
     if module:
         modules = (module,)
     else:
         modules = webassets.modules
     for module in modules:
-        if paths:
-            path_list = paths
-        else:
-            proxy = webassets._get_proxy(module)
-            path_list = list(proxy.iter_default_paths())
-        name = webassets.get_bundle_name(module, path_list)
-        module_hash = webassets.get_bundle_hash(module, path_list)
+        name = webassets.get_bundle_name(module, paths)
+        module_hash = webassets.get_bundle_hash(module, paths)
         print('%s/%s %s' % (module, name, module_hash))
 
 
@@ -128,16 +128,14 @@ def bundle_hash(clickctx, module, paths):
 @click.pass_context
 def freeze(clickctx):
     """
-    Provides the real bundle hashes.
+    Provides a stable value for freezing.
     """
     webassets = clickctx.obj['conf'].load('webassets')
     webassets.freeze = False
     modules = webassets.modules
     hash = xxhash.xxh64()
     for module in modules:
-        proxy = webassets._get_proxy(module)
-        path_list = list(proxy.iter_default_paths())
-        hash.update(webassets.get_bundle_hash(module, path_list))
+        hash.update(webassets.get_bundle_hash(module))
     print(hash.hexdigest())
 
 
