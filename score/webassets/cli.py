@@ -33,7 +33,7 @@ def asset_hash(clickctx, module, paths):
         else:
             proxy = webassets._get_proxy(module)
             path_iter = proxy.iter_default_paths()
-        for path in sorted(path_iter):
+        for path in path_iter:
             hash = webassets.get_asset_hash(module, path)
             print('%s/%s %s' % (module, path, hash))
 
@@ -57,7 +57,7 @@ def asset_url(clickctx, module, paths):
         else:
             proxy = webassets._get_proxy(module)
             path_iter = proxy.iter_default_paths()
-        for path in sorted(path_iter):
+        for path in path_iter:
             print(webassets.get_asset_url(module, path))
 
 
