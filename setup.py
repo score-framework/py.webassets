@@ -63,7 +63,6 @@ setup(
     install_requires=[
         'score.init >= 0.3',
         'xxhash',
-        'dill',
     ],
     entry_points={
         'score.cli': [

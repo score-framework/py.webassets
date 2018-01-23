@@ -113,10 +113,12 @@ class TemplateWebassetsProxy(WebassetsProxy):
     def __init__(self, tpl, mimetype):
         self.tpl = tpl
         self._mimetype = mimetype
-        import dill
         self.postprocessors_hash = xxhash.xxh64()
-        for postprocessor in tpl.filetypes[self._mimetype].postprocessors:
-            self.postprocessors_hash.update(dill.dumps(postprocessor))
+        postprocessors = tpl.filetypes[self._mimetype].postprocessors
+        # TODO: the next line just includes the number of postprocessors, it
+        # should somehow base the hash on the postprocessor instances, not just
+        # the sheer amount
+        self.postprocessors_hash.update(bytes([len(postprocessors)]))
 
     def iter_default_paths(self):
         hidden_regex = re.compile(r'(^|/)_')
