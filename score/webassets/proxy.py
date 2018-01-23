@@ -113,6 +113,10 @@ class TemplateWebassetsProxy(WebassetsProxy):
     def __init__(self, tpl, mimetype):
         self.tpl = tpl
         self._mimetype = mimetype
+        import dill
+        self.postprocessors_hash = xxhash.xxh64()
+        for postprocessor in tpl.filetypes[self._mimetype].postprocessors:
+            self.postprocessors_hash.update(dill.dumps(postprocessor))
 
     def iter_default_paths(self):
         hidden_regex = re.compile(r'(^|/)_')
@@ -124,8 +128,20 @@ class TemplateWebassetsProxy(WebassetsProxy):
     def validate_path(self, path):
         return path in self.tpl.iter_paths(mimetype=self._mimetype)
 
+    def bundle_hash(self, paths):
+        """
+        Provides the hash of the bundle with given *paths*.
+        """
+        hash = self.postprocessors_hash.copy()
+        for path in sorted(paths):
+            hash.update(self.tpl.hash(path))
+            hash.update(b'\0')
+        return hash.hexdigest()
+
     def hash(self, path):
-        return self.tpl.hash(path)
+        hash = self.postprocessors_hash.copy()
+        hash.update(self.tpl.hash(path))
+        return hash.hexdigest()
 
     def render(self, path):
         try:
