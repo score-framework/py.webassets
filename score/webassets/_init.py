@@ -104,9 +104,9 @@ class ConfiguredWebassetsModule(ConfiguredModule):
 
     def _register_tpl_globals(self):
         self.tpl.filetypes['text/html'].add_global(
-            'webassets_link', self._generate_html_tag, escape=False)
+            'webassets_link', self.generate_html_tag, escape=False)
         self.tpl.filetypes['text/html'].add_global(
-            'webassets_content', self._generate_html_content, escape=False)
+            'webassets_content', self.generate_html_content, escape=False)
 
     def _register_http_route(self):
         @self.http.newroute('score.webassets', '/_assets/{module}/{path>.*}')
@@ -138,7 +138,12 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             (module, score._modules[module].score_webassets_proxy())
             for module in self.modules)
 
-    def _generate_html_tag(self, module, *paths):
+    def generate_html_tag(self, module, *paths):
+        """
+        Generates the necessary HTML tag(s) for loading given assets with a
+        separate HTTP request. Will return a link tag like
+        ``<link rel="stylesheet" href="...">`` for including css, for example.
+        """
         if not paths:
             proxy = self._get_proxy(module)
             if self.tpl_autobundle:
@@ -159,10 +164,18 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                 parts.append(proxy.render_url(url))
             return ''.join(parts)
 
-    def _generate_html_content(self, module, *paths):
+    def generate_html_content(self, module, *paths):
+        """
+        Generates the necessary HTML tag(s) for including given assets in the
+        current page. Will return a ``<style>`` tag for css, for example.
+        """
         if not paths:
             paths = None
         return self.get_bundle_content(module, paths)
+
+    # the next two functions are for backward compatibility
+    _generate_html_tag = generate_html_tag
+    _generate_html_content = generate_html_content
 
     def _get_proxy_default_paths(self, proxy):
         if not self.freeze:
