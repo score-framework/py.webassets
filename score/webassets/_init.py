@@ -63,9 +63,9 @@ def init(confdict, http=None, tpl=None):
 
     :confkey:`tpl.autobundle` :confdefault:`False`
         Whether the webassets_* functions registered with :mod:`score.tpl`
-        should provide :term:`bundles <asset bundle>` instead of separate files.
-        This should be set to `True` on deployment systems to speed up web page
-        rendering.
+        should provide :term:`bundles <asset bundle>` instead of separate
+        files. This should be set to `True` on deployment systems to speed up
+        web page rendering.
 
     """
     conf = dict(defaults.items())
@@ -78,8 +78,9 @@ def init(confdict, http=None, tpl=None):
         freeze = parse_bool(conf['freeze'])
     except ValueError:
         freeze = conf['freeze']
-    return ConfiguredWebassetsModule(http, tpl, modules, conf['rootdir'],
-                                     freeze, parse_bool(conf['tpl.autobundle']))
+    return ConfiguredWebassetsModule(
+        http, tpl, modules, conf['rootdir'], freeze,
+        parse_bool(conf['tpl.autobundle']))
 
 
 class ConfiguredWebassetsModule(ConfiguredModule):
@@ -123,11 +124,11 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             ctx.http.response.text = body
 
         @webassets.vars2url
-        def webassets_vars2url(ctx, module, paths):
+        def _webassets_vars2url(ctx, module, paths):
             return '/_assets' + self.get_bundle_url(module, paths)
 
         @webassets.match2vars
-        def webassets_match2vars(ctx, matches):
+        def _webassets_match2vars(ctx, matches):
             return {
                 'module': matches['module'],
                 'paths': matches['path'],
@@ -278,13 +279,13 @@ class ConfiguredWebassetsModule(ConfiguredModule):
 
     def get_bundle_name(self, module, paths=None):
         """
-        Provides a unique name for a :term:`bundle <asset bundle>` consisting of
-        assets found in given *module* and given *paths*. Will use the module's
-        :meth:`default paths <WebassetsProxy.iter_default_bundle_paths>`, if the
-        latter is omitted.
+        Provides a unique name for a :term:`bundle <asset bundle>` consisting
+        of assets found in given *module* and given *paths*. Will use the
+        module's :meth:`default paths
+        <WebassetsProxy.iter_default_bundle_paths>`, if the latter is omitted.
 
-        This feature is used internally for storing different bundles inside the
-        same folder, for example.
+        This feature is used internally for storing different bundles inside
+        the same folder, for example.
         """
         if paths is None:
             proxy = self._get_proxy(module)
@@ -297,8 +298,8 @@ class ConfiguredWebassetsModule(ConfiguredModule):
     def get_bundle_hash(self, module, paths=None):
         """
         Provides the :term:`hash <asset hash>` of a :term:`bundle <asset
-        bundle>` consisting of assets found in given *module* and given *paths*.
-        Will use the module's :meth:`default paths
+        bundle>` consisting of assets found in given *module* and given
+        *paths*. Will use the module's :meth:`default paths
         <WebassetsProxy.iter_default_bundle_paths>`, if the latter is omitted.
         """
         if paths is None:
@@ -377,13 +378,14 @@ class ConfiguredWebassetsModule(ConfiguredModule):
     def get_request_response(self, request):
         """
         Provides the most efficient response to an HTTP :class:`Request` to
-        obtain an asset. The return value is 3-tuple ``(status, headers, body)``
-        containing an HTTP status code, a `dict` of HTTP headers and the
-        response body.
+        obtain an asset. The return value is 3-tuple
+        ``(status, headers, body)`` containing an HTTP status code, a `dict`
+        of HTTP headers and the response body.
         The *headers* list in the latter case is a `dict` mapping header names
         to their values, whereas the *body* is just a string. Note that none of
         the return values are formatted in any way. They will need to be
-        properly encoded (which should happen automatically in most frameworks).
+        properly encoded (which should happen automatically in most
+        frameworks).
         """
         try:
             module, path = request.path.lstrip('/').split('/', maxsplit=1)
@@ -404,7 +406,8 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                         try:
                             content = open(file).read()
                         except FileNotFoundError:
-                            raise AssetNotFound(module, '%s@%s' % (path, hash_))
+                            raise AssetNotFound(module,
+                                                '%s@%s' % (path, hash_))
                         return content.split('\n', maxsplit=1)
                     proxy = self._get_proxy(module, path)
                     return proxy.mimetype(path), proxy.render(path)
@@ -420,9 +423,9 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                 'if-none-match' in headers or
                 'if-modified-since' in headers)
             # it really doesn't matter what the values of these headers are,
-            # they merely indicate that the resource was requested by the client
-            # earlier and it is now checking for changes. but since assets with
-            # hashes are immutable, we can always respond with 304.
+            # they merely indicate that the resource was requested by the
+            # client earlier and it is now checking for changes. but since
+            # assets with hashes are immutable, we can always respond with 304.
             if can_send_304:
                 return 304, {}, ''
             hash_ = request.GET['_v']
@@ -439,9 +442,10 @@ class ConfiguredWebassetsModule(ConfiguredModule):
         if 'if-modified-since' in headers and self.rootdir:
             t = time.mktime(email.utils.parsedate(
                 headers['if-modified-since']))
+            getmtime = os.path.getmtime
             folder = os.path.join(self.rootdir, module, path)
             try:
-                if not any(os.path.getmtime(f) > t for f in os.listdir(folder)):
+                if not any(getmtime(f) > t for f in os.listdir(folder)):
                     # there aren't any newer files in this folder
                     return 304, {}, ''
             except FileNotFoundError:
