@@ -85,10 +85,10 @@ class WebassetsProxy(abc.ABC):
 class TemplateWebassetsProxy(WebassetsProxy):
     """
     A type of :class:`WebassetsProxy` that treats templates like assets. It
-    accepts a configured :mod:`score.tpl` module and a mime type string and will
-    provide almost all templates, that the tpl module knows of, as assets. If
-    the tpl module knows of css files, for example, this class can be used to
-    provide these css files as assets.
+    accepts a configured :mod:`score.tpl` module and a mime type string and
+    will provide almost all templates, that the tpl module knows of, as assets.
+    If the tpl module knows of css files, for example, this class can be used
+    to provide these css files as assets.
 
     The default path list--as returned by :meth:`iter_default_paths
     <WebassetsProxy.iter_default_paths>`--will omit all files starting with
