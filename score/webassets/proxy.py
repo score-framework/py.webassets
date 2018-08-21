@@ -176,7 +176,11 @@ class TemplateWebassetsProxy(WebassetsProxy):
             return self.tpl.render(path)
         except TemplateNotFound:
             from ._init import AssetNotFound
-            raise AssetNotFound(path)
+            # TODO:  The following call should be replaced.
+            # The first parameter to AssetNotFound should actually be the
+            # module name, but we do not know have that information at this
+            # point. Fix this when there is a good solution.
+            raise AssetNotFound('???', path)
 
     def mimetype(self, path):
         return self._mimetype
