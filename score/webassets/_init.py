@@ -1,4 +1,5 @@
 # Copyright © 2015-2018 STRG.AT GmbH, Vienna, Austria
+# Copyright © 2018 Necdet Can Ateşman, Vienna, Austria
 #
 # This file is part of the The SCORE Framework.
 #
@@ -463,10 +464,10 @@ class ConfiguredWebassetsModule(ConfiguredModule):
 
     def _get_proxy(self, module, *paths):
         if module not in self.modules:
-            path = '???'
             if paths:
-                path = paths[0]
-            raise AssetNotFound(module, path)
+                raise ModuleNotConfigured(module, paths[0])
+            else:
+                raise ModuleNotConfigured(module)
         proxy = self.proxies[module]
         if self.freeze:
             if not hasattr(self, '_proxy_valid_paths'):
@@ -489,7 +490,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
 
 class AssetNotFound(Exception):
     """
-    Thrown when an asset was requested, but not found. Web applications might
+    Raised when an asset was requested, but not found. Web applications might
     want to return the HTTP status code 404 in this case.
 
     Assets are uniquely identified by the combination of their :term:`module
@@ -500,3 +501,14 @@ class AssetNotFound(Exception):
         self.module = module
         self.path = path
         super().__init__('/%s/%s' % (module, path))
+
+
+class ModuleNotConfigured(AssetNotFound):
+    """
+    Raised when an asset in an unconfigured module was requested.
+    """
+
+    def __init__(self, module, path='???'):
+        self.module = module
+        self.path = path
+        Exception.__init__(self, module)
