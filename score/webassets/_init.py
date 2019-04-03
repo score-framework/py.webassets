@@ -392,6 +392,9 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             module, path = request.path.lstrip('/').split('/', maxsplit=1)
             if path.startswith('__bundle_') and path.endswith('__'):
                 def loader(hash_=None):
+                    if not hash_:
+                        raise AssetNotFound(module,
+                                            'bundle(%s)@None' % (name,))
                     name = path[len('__bundle_'):-2]
                     file = os.path.join(self.rootdir, module, name, hash_)
                     try:
