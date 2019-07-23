@@ -437,9 +437,10 @@ class ConfiguredWebassetsModule(ConfiguredModule):
                 mimetype, body = loader(hash_)
             except FileNotFoundError:
                 raise AssetNotFound(module, path)
+            max_age = 60 * 60 * 24 * 30 * 12
             return 200, {
                 'Content-Type': mimetype,
-                'Cache-Control': 'max-age=' + str(60 * 60 * 24 * 30 * 12),
+                'Cache-Control': 'max-age=%d s-max-age=%d' % (max_age, max_age)
                 'Etag': hash_,
                 'Last-Modified': email.utils.formatdate(),
             }, body
