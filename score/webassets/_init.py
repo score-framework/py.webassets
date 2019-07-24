@@ -140,11 +140,14 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             (module, score._modules[module].score_webassets_proxy())
             for module in self.modules)
 
-    def generate_html_tag(self, module, *paths):
+    def generate_html_tag(self, module, *paths, **kwargs):
         """
         Generates the necessary HTML tag(s) for loading given assets with a
         separate HTTP request. Will return a link tag like
         ``<link rel="stylesheet" href="...">`` for including css, for example.
+
+        Any additional keyword-arguments will be passed to the proxy's
+        render_url() method.
         """
         if not paths:
             proxy = self._get_proxy(module)
@@ -158,12 +161,12 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             proxy = self._get_proxy(module, *paths)
         if self.tpl_autobundle:
             url = self.http.url(None, 'score.webassets', module, paths)
-            return proxy.render_url(url)
+            return proxy.render_url(url, **kwargs)
         else:
             parts = []
             for path in paths:
                 url = self.http.url(None, 'score.webassets', module, [path])
-                parts.append(proxy.render_url(url))
+                parts.append(proxy.render_url(url, **kwargs))
             return ''.join(parts)
 
     def generate_html_content(self, module, *paths):
