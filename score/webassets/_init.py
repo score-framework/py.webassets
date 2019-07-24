@@ -443,7 +443,7 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             year = 60 * 60 * 24 * 30 * 12
             return 200, {
                 'Content-Type': mimetype,
-                'Cache-Control': 'max-age=%d s-max-age=%d' % (year, year),
+                'Cache-Control': 'max-age=%d, s-max-age=%d' % (year, year),
                 'Etag': hash_,
                 'Last-Modified': email.utils.formatdate(),
             }, body
