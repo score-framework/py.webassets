@@ -40,7 +40,7 @@ from ._init import init, ConfiguredWebassetsModule, AssetNotFound, Request
 from .proxy import TemplateWebassetsProxy, WebassetsProxy
 
 
-__version__ = '0.3.23'
+__version__ = '0.3.24'
 
 __all__ = (
     'init', 'ConfiguredWebassetsModule', 'AssetNotFound', 'Request',
