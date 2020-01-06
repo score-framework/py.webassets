@@ -25,13 +25,15 @@
 # the discretion of STRG.AT GmbH also the competent court, in whose district
 # the Licensee has his registered seat, an establishment or assets.
 
+from collections import namedtuple
+import email.utils
+import os
+import re
+import time
+
 from score.init import (
     ConfiguredModule, ConfigurationError, parse_list, parse_bool)
-import os
-import email.utils
-import time
 import xxhash
-from collections import namedtuple
 
 Request = namedtuple('Request', ('path', 'GET', 'headers'))
 
@@ -436,6 +438,8 @@ class ConfiguredWebassetsModule(ConfiguredModule):
             if can_send_304:
                 return 304, {}, ''
             hash_ = request.GET['_v']
+            if not re.match(r'^[0-9a-f]+$', hash_):
+                raise AssetNotFound(module, path)
             try:
                 mimetype, body = loader(hash_)
             except FileNotFoundError:
