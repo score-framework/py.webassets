@@ -155,7 +155,10 @@ class TemplateWebassetsProxy(WebassetsProxy):
             if not hidden_regex.search(path))
 
     def validate_path(self, path):
-        return path in self.tpl.iter_paths(mimetype=self._mimetype)
+        try:
+            return self.tpl.mimetype(path) == self._mimetype
+        except TemplateNotFound:
+            return False
 
     def bundle_hash(self, paths):
         """
